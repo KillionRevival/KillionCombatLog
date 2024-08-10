@@ -1,17 +1,17 @@
 package co.killionrevival.killionCombatLog;
 
 import co.killionrevival.killionCombatLog.commands.LogoutCommand;
+import co.killionrevival.killionCombatLog.commands.TestLogOutNpcSpawn;
 import co.killionrevival.killionCombatLog.listener.DisconnectListener;
 import co.killionrevival.killionCombatLog.listener.StopLogoutListeners;
 import co.killionrevival.killionCombatLog.managers.LogoutManager;
-import co.killionrevival.killioncommons.KillionCommonsApi;
+import co.killionrevival.killioncommons.KillionUtilities;
 import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.flags.registry.FlagConflictException;
 import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
 import lombok.Getter;
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class KillionCombatLog extends JavaPlugin {
@@ -20,14 +20,14 @@ public final class KillionCombatLog extends JavaPlugin {
     @Getter
     static KillionCombatLog instance;
     @Getter
-    static KillionCommonsApi commons;
+    static KillionUtilities commons;
     @Getter
     LogoutManager logoutManager;
 
     @Override
     public void onLoad() {
         instance = this;
-        commons = new KillionCommonsApi(this);
+        commons = new KillionUtilities(this);
         commons.getConsoleUtil().sendInfo("KillionCombatLog Initializing");
 
         if (getServer().getPluginManager().isPluginEnabled("WorldGuard")) {
@@ -56,6 +56,7 @@ public final class KillionCombatLog extends JavaPlugin {
 
     private void registerCommands() {
         getCommand("logout").setExecutor(new LogoutCommand());
+        getCommand("testlogoutnpc").setExecutor(new TestLogOutNpcSpawn());
     }
 
     private void registerWorldGuardFlags() {
