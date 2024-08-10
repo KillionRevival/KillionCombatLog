@@ -3,4 +3,11 @@ version: '1.0-SNAPSHOT'
 main: co.killionrevival.killionCombatLog.KillionCombatLog
 authors: [tut, flyerz, Fross]
 api-version: '1.18'
-depend: [WorldGuard]
+depend: [WorldGuard, KillionCommons]
+commands:
+  logout:
+    aliases: [log, l]
+    description: Logs you out after 10 seconds
+    usage: /logout
+    permission: combatlog.logout
+    permission-message: You don't have permission to use this command.

@@ -1,5 +1,9 @@
 package co.killionrevival.killionCombatLog;
 
+import co.killionrevival.killionCombatLog.commands.LogoutCommand;
+import co.killionrevival.killionCombatLog.listener.DisconnectListener;
+import co.killionrevival.killionCombatLog.listener.StopLogoutListeners;
+import co.killionrevival.killionCombatLog.managers.LogoutManager;
 import co.killionrevival.killioncommons.KillionCommonsApi;
 import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.protection.flags.Flag;
@@ -7,6 +11,7 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.flags.registry.FlagConflictException;
 import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
 import lombok.Getter;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class KillionCombatLog extends JavaPlugin {
@@ -14,15 +19,16 @@ public final class KillionCombatLog extends JavaPlugin {
 
     @Getter
     static KillionCombatLog instance;
-
     @Getter
     static KillionCommonsApi commons;
+    @Getter
+    LogoutManager logoutManager;
 
     @Override
-    public void onEnable() {
+    public void onLoad() {
         instance = this;
         commons = new KillionCommonsApi(this);
-        commons.getConsoleUtil().sendInfo("KillionCombatLog initialized");
+        commons.getConsoleUtil().sendInfo("KillionCombatLog Initializing");
 
         if (getServer().getPluginManager().isPluginEnabled("WorldGuard")) {
             registerWorldGuardFlags();
@@ -30,8 +36,26 @@ public final class KillionCombatLog extends JavaPlugin {
     }
 
     @Override
+    public void onEnable() {
+        logoutManager = new LogoutManager();
+
+        registerCommands();
+
+        getServer().getPluginManager().registerEvents(new StopLogoutListeners(), this);
+        getServer().getPluginManager().registerEvents(new DisconnectListener(), this);
+
+
+        commons.getConsoleUtil().sendInfo("KillionCombatLog Finished Loading");
+    }
+
+    @Override
     public void onDisable() {
         // Plugin shutdown logic
+        logoutManager.cleanUp();
+    }
+
+    private void registerCommands() {
+        getCommand("logout").setExecutor(new LogoutCommand());
     }
 
     private void registerWorldGuardFlags() {
