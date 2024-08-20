@@ -4,6 +4,7 @@ import co.killionrevival.killionCombatLog.npc.LoggedOutPlayer;
 import co.killionrevival.killioncommons.KillionCommons;
 import co.killionrevival.killioncommons.npc.NpcManager;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
@@ -31,14 +32,15 @@ public class TestLogOutNpcSpawn implements TabExecutor {
         if (args.length == 0) {
             // should spawn an npc at the player's location with their UUID and name.
             npcManager.spawn(
-                    new LoggedOutPlayer(UUID.randomUUID(), player.getName(), Bukkit.getOfflinePlayer(player.getUniqueId())),
+                    new LoggedOutPlayer(UUID.randomUUID(), player.getName()),
                     player.getLocation()
             );
         }
         else {
+            final OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(args[0]);
             // should spawn an npc at the player's location with their UUID and name.
             npcManager.spawn(
-                    new LoggedOutPlayer(UUID.randomUUID(), player.getName(), Bukkit.getOfflinePlayer(args[0])),
+                    new LoggedOutPlayer(offlinePlayer.getUniqueId(), offlinePlayer.getName()),
                     player.getLocation()
             );
         }
