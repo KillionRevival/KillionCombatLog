@@ -3,14 +3,11 @@ version: '1.0-SNAPSHOT'
 main: co.killionrevival.killionCombatLog.KillionCombatLog
 authors: [tut, flyerz, Fross]
 api-version: '1.18'
-depend: [WorldGuard, KillionCommons]
+depend: [WorldGuard, KillionCommons, Citizens]
 commands:
-  logout:
-    aliases: [log, l]
-    description: Logs you out after 10 seconds
-    usage: /logout
-    permission: combatlog.logout
-    permission-message: You don't have permission to use this command.
-  testlogoutnpc:
-    description: Test spawning an NPC
-    usage: /testlogoutnpc
+  killioncombatlog:
+    usage: /<command> <reload>
+    description: A command to control the FLCombatLog system.
+    aliases:
+      - kcl
+    permission: killioncombatlog.reload

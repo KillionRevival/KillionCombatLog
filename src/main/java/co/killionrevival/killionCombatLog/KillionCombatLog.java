@@ -1,82 +1,73 @@
 package co.killionrevival.killionCombatLog;
 
-import co.killionrevival.killionCombatLog.commands.LogoutCommand;
-import co.killionrevival.killionCombatLog.commands.TestLogOutNpcSpawn;
-import co.killionrevival.killionCombatLog.listener.DisconnectListener;
-import co.killionrevival.killionCombatLog.listener.StopLogoutListeners;
-import co.killionrevival.killionCombatLog.managers.LogoutManager;
-import co.killionrevival.killioncommons.KillionUtilities;
-import com.sk89q.worldguard.WorldGuard;
-import com.sk89q.worldguard.protection.flags.Flag;
-import com.sk89q.worldguard.protection.flags.StateFlag;
-import com.sk89q.worldguard.protection.flags.registry.FlagConflictException;
-import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
-import lombok.Getter;
+import co.killionrevival.killionCombatLog.commands.KCLCommand;
+import co.killionrevival.killionCombatLog.listeners.CombatLogListener;
+import co.killionrevival.killionCombatLog.listeners.PlayerListener;
+import co.killionrevival.killionCombatLog.managers.CombatLogManager;
+import co.killionrevival.killionCombatLog.managers.CombatManager;
+import co.killionrevival.killionCombatLog.managers.NPCManager;
+import co.killionrevival.killionCombatLog.managers.TraitManager;
+import co.killionrevival.killionCombatLog.utils.Utils;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class KillionCombatLog extends JavaPlugin {
-    public static StateFlag KILLION_COMBAT_LOG_WORLDGUARD_FLAG;
 
-    @Getter
-    static KillionCombatLog instance;
-    @Getter
-    static KillionUtilities commons;
-    @Getter
-    LogoutManager logoutManager;
+    private CombatManager combatManager;
+    private CombatLogManager combatLogManager;
+    private TraitManager traitManager;
+    private NPCManager npcManager;
 
-    @Override
-    public void onLoad() {
-        instance = this;
-        commons = new KillionUtilities(this);
-        commons.getConsoleUtil().sendInfo("KillionCombatLog Initializing");
+    public CombatManager getCombatManager() {
+        return this.combatManager;
+    }
+    public CombatLogManager getCombatLogManager() { return this.combatLogManager; }
+    public TraitManager getTraitManager() {
+        return this.traitManager;
+    }
+    public NPCManager getNPCManager() {
+        return this.npcManager;
+    }
 
-        if (getServer().getPluginManager().isPluginEnabled("WorldGuard")) {
-            registerWorldGuardFlags();
-        }
+    void init() {
+        this.saveDefaultConfig();
+        this.getConfig().options().copyDefaults(true);
+        this.getConfig().addDefault("messages.in-combat", "&cYou are now in combat &4&l>> &a%seconds% seconds.");
+        this.getConfig().addDefault("messages.no-longer", "&cYou are no longer in combat.");
+        this.getConfig().addDefault("settings.npc-lifetime-seconds", 30);
+        this.getConfig().addDefault("settings.combat-tag-duration", 30);
+        this.saveConfig();
+
+        this.combatManager = new CombatManager(this);
+        this.combatLogManager = new CombatLogManager(this);
+        this.traitManager = new TraitManager(this);
+        this.npcManager = new NPCManager(this);
+    }
+
+    void register() {
+        this.getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
+        this.getServer().getPluginManager().registerEvents(new CombatLogListener(this), this);
+
+        KCLCommand flclCommand = new KCLCommand(this);
+        this.getCommand("killionCombatLog").setExecutor(flclCommand);
+        this.getCommand("killionCombatLog").setTabCompleter(flclCommand);
+    }
+    void start() {
+        this.getServer().getConsoleSender().sendMessage(Utils.chat("[KillionCombatLog] &aLoaded KillionCombatLog."));
+    }
+    void stop() {
+        this.combatManager.close();
+        this.getServer().getConsoleSender().sendMessage(Utils.chat("[KillionCombatLog] &cStopped KillionCombatLog."));
     }
 
     @Override
     public void onEnable() {
-        logoutManager = new LogoutManager();
-
-        registerCommands();
-
-        getServer().getPluginManager().registerEvents(new StopLogoutListeners(), this);
-        getServer().getPluginManager().registerEvents(new DisconnectListener(), this);
-
-
-        commons.getConsoleUtil().sendInfo("KillionCombatLog Finished Loading");
+        this.init();
+        this.register();
+        this.start();
     }
 
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
-        logoutManager.cleanUp();
-    }
-
-    private void registerCommands() {
-        getCommand("logout").setExecutor(new LogoutCommand());
-        getCommand("testlogoutnpc").setExecutor(new TestLogOutNpcSpawn());
-    }
-
-    private void registerWorldGuardFlags() {
-        commons.getConsoleUtil().sendInfo("Registering WorldGuard flags");
-        FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
-        try {
-            StateFlag flag = new StateFlag("kcombatlog-safe", true);
-            registry.register(flag);
-            KILLION_COMBAT_LOG_WORLDGUARD_FLAG = flag;
-        } catch (FlagConflictException e) {
-            commons.getConsoleUtil().sendError("Error initializing flag");
-            Flag<?> existing = registry.get("kcombatlog-safe");
-            if (existing instanceof StateFlag) {
-                commons.getConsoleUtil().sendError("Existing flag was typed correctly - setting instance to existing flag.");
-                KILLION_COMBAT_LOG_WORLDGUARD_FLAG = (StateFlag) existing;
-            } else {
-                commons.getConsoleUtil().sendError("Flag instance was not typed correctly?! How?!");
-                commons.getConsoleUtil().sendThrowable(e);
-            }
-        }
-        commons.getConsoleUtil().sendInfo("Done!");
+        this.stop();
     }
 }
