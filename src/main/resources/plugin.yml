@@ -7,7 +7,7 @@ depend: [WorldGuard, KillionCommons, Citizens]
 commands:
   killioncombatlog:
     usage: /<command> <reload>
-    description: A command to control the FLCombatLog system.
+    description: A command to control the KillionCombatLog system.
     aliases:
       - kcl
     permission: killioncombatlog.reload

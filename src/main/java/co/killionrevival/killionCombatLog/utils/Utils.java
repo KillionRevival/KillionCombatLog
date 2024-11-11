@@ -1,20 +1,50 @@
 package co.killionrevival.killionCombatLog.utils;
 
-import org.bukkit.ChatColor;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
+/**
+ * Utility class providing helper methods for text formatting and time conversion.
+ */
 public class Utils {
 
-    public static String chat(String text) {
-        return ChatColor.translateAlternateColorCodes('&', text);
+    /**
+     * Converts a string with legacy color codes (e.g., '&a') into a Component.
+     * Suitable for sending messages to players.
+     *
+     * @param text The input text containing legacy color codes.
+     * @return A Component representing the formatted text.
+     */
+    public static Component chatComponent(String text) {
+        return LegacyComponentSerializer.legacyAmpersand().deserialize(text);
     }
 
+    /**
+     * Translates color codes in the input string to their corresponding color codes using '§'.
+     * Suitable for methods requiring a String with color codes.
+     *
+     * @param text The input text containing color codes (e.g., '&aHello World')
+     * @return A string with color codes translated using '§' symbol.
+     */
+    public static String colorize(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace('&', '§');
+    }
+
+    /**
+     * Converts a time duration in milliseconds to a human-readable format.
+     * Formats the duration into hours, minutes, and seconds.
+     *
+     * @param milliseconds The time duration in milliseconds.
+     * @return A formatted string representing the time duration.
+     */
     public static String formatTime(long milliseconds) {
-        // Constants for time conversions
         final long ONE_SECOND = 1000;
         final long ONE_MINUTE = 60 * ONE_SECOND;
         final long ONE_HOUR = 60 * ONE_MINUTE;
 
-        // Calculate hours, minutes, and seconds
         long hours = milliseconds / ONE_HOUR;
         milliseconds %= ONE_HOUR;
 
@@ -23,7 +53,6 @@ public class Utils {
 
         long seconds = milliseconds / ONE_SECOND;
 
-        // Build the formatted time string
         StringBuilder timeString = new StringBuilder();
 
         if (hours > 0) {
@@ -44,10 +73,10 @@ public class Utils {
             timeString.append(seconds).append(" seconds");
         }
 
-        if (timeString.length() <= 0)
+        if (timeString.length() <= 0) {
             return "0 seconds";
+        }
 
         return timeString.toString();
     }
-
 }

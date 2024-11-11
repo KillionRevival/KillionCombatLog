@@ -13,16 +13,25 @@ import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
+/**
+ * Custom trait for NPCs representing combat loggers.
+ * Manages the NPC's behavior, including damage handling, death, and hologram updates.
+ */
 public class CombatLogTrait extends Trait implements Listener {
+
     private final KillionCombatLog plugin = KillionCombatLog.getPlugin(KillionCombatLog.class);
-    private int secondsLeft = plugin.getConfig().getInt("settings.npc-lifetime-seconds");
+    private int secondsLeft;
     private double currentAbsorption = 0.0;
     private Player parentPlayer;
     private BukkitRunnable countdownTask;
     private HologramTrait hologramTrait;
 
+    /**
+     * Constructor to initialize the trait.
+     */
     public CombatLogTrait() {
         super("CombatLogTrait");
+        this.secondsLeft = plugin.getConfig().getInt("settings.npc-lifetime-seconds");
     }
 
     @Override
@@ -37,45 +46,80 @@ public class CombatLogTrait extends Trait implements Listener {
         clearHologram();
     }
 
+    /**
+     * Event handler for when the NPC takes damage.
+     * Adjusts health and absorption accordingly.
+     *
+     * @param event The NPCDamageByEntityEvent.
+     */
     @EventHandler
     public void onNPCDamage(NPCDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player)) {
+        if (event.getNPC() != this.getNPC() || !(event.getDamager() instanceof Player)) {
             return;
         }
 
         event.setCancelled(false);
 
         double damage = event.getDamage();
-        double reducedDamage = calculateFinalDamage((Player) getNPC().getEntity(), damage);
+        double finalDamage = calculateFinalDamage((Player) getNPC().getEntity(), damage);
 
-        handleAbsorption(event, reducedDamage);
+        handleAbsorption(event, finalDamage);
         resetCountdown((int) damage);
     }
 
+    /**
+     * Event handler for when the NPC dies.
+     * Drops the NPC's inventory and marks the player as dead.
+     *
+     * @param event The NPCDeathEvent.
+     */
     @EventHandler
     public void onNPCDeath(NPCDeathEvent event) {
-        if (event.getNPC() != getNPC()) {
+        if (event.getNPC() != this.getNPC()) {
             return;
         }
 
-        handleNPCDeath();
+        Player npcPlayer = (Player) getNPC().getEntity();
+        dropPlayerInventory(npcPlayer);
+
+        getNPC().despawn();
+        getNPC().destroy();
+
+        String killerName = npcPlayer.getKiller() != null ? npcPlayer.getKiller().getName() : "unknown";
+        plugin.getCombatManager().setPlayerAsDead(parentPlayer.getUniqueId(), killerName, true);
     }
 
+    /**
+     * Sets the parent player of the NPC.
+     *
+     * @param parentPlayer The parent player.
+     */
     public void setParentPlayer(Player parentPlayer) {
         this.parentPlayer = parentPlayer;
     }
 
+    /**
+     * Sets the current absorption amount for the NPC.
+     *
+     * @param absorption The absorption amount.
+     */
     public void setAbsorption(double absorption) {
         this.currentAbsorption = absorption / 2;
     }
 
-    private void handleAbsorption(NPCDamageByEntityEvent event, double reducedDamage) {
+    /**
+     * Handles absorption effects when the NPC takes damage.
+     *
+     * @param event       The NPCDamageByEntityEvent.
+     * @param finalDamage The calculated final damage.
+     */
+    private void handleAbsorption(NPCDamageByEntityEvent event, double finalDamage) {
         if (currentAbsorption > 0) {
-            if (currentAbsorption > reducedDamage) {
-                currentAbsorption -= reducedDamage;
+            if (currentAbsorption > finalDamage) {
+                currentAbsorption -= finalDamage;
                 event.setDamage(0);
             } else {
-                event.setDamage(reducedDamage - currentAbsorption);
+                event.setDamage(finalDamage - currentAbsorption);
                 currentAbsorption = 0;
             }
         } else {
@@ -83,20 +127,9 @@ public class CombatLogTrait extends Trait implements Listener {
         }
     }
 
-    private void handleNPCDeath() {
-        Player player = (Player) getNPC().getEntity();
-        dropPlayerInventory(player);
-
-        getNPC().despawn();
-        getNPC().destroy();
-
-        plugin.getCombatManager().setPlayerAsDead(parentPlayer.getUniqueId(), getKillerName(player), true);
-    }
-
-    private String getKillerName(Player player) {
-        return player.getKiller() != null ? player.getKiller().getName() : "unknown";
-    }
-
+    /**
+     * Handles NPC death by dropping its inventory.
+     */
     private void dropPlayerInventory(Player player) {
         for (ItemStack item : player.getInventory().getContents()) {
             if (item != null) {
@@ -105,6 +138,9 @@ public class CombatLogTrait extends Trait implements Listener {
         }
     }
 
+    /**
+     * Starts the countdown timer for the NPC's lifetime.
+     */
     private void startCountdown() {
         if (countdownTask != null) {
             countdownTask.cancel();
@@ -127,6 +163,9 @@ public class CombatLogTrait extends Trait implements Listener {
         countdownTask.runTaskTimer(plugin, 20L, 20L);
     }
 
+    /**
+     * Cancels the countdown timer.
+     */
     private void cancelCountdown() {
         if (countdownTask != null) {
             countdownTask.cancel();
@@ -134,38 +173,59 @@ public class CombatLogTrait extends Trait implements Listener {
         }
     }
 
+    /**
+     * Resets the countdown timer when the NPC takes damage.
+     *
+     * @param damage The amount of damage taken.
+     */
     private void resetCountdown(int damage) {
         secondsLeft += damage;
         updateHologram();
     }
 
+    /**
+     * Sets up the hologram display above the NPC.
+     */
     private void setupHologram() {
         hologramTrait = getNPC().getOrAddTrait(HologramTrait.class);
         updateHologram();
     }
 
+    /**
+     * Clears the hologram when the trait is removed.
+     */
     private void clearHologram() {
         if (hologramTrait != null) {
             hologramTrait.clear();
         }
     }
 
+    /**
+     * Updates the hologram to reflect the current countdown and health.
+     */
     private void updateHologram() {
         if (hologramTrait == null) {
             return;
         }
 
-        Player player = (Player) getNPC().getEntity();
-        if (player == null) {
+        Player npcPlayer = (Player) getNPC().getEntity();
+        if (npcPlayer == null) {
             plugin.getLogger().warning("Entity is not a Player!");
             return;
         }
 
-        hologramTrait.setLine(0, Utils.chat("&a" + Utils.formatTime(secondsLeft * 1000) + "."));
-        hologramTrait.setLine(1, Utils.chat("&c&lDISCONNECT: &7" + getNPC().getName()));
-        hologramTrait.setLine(2, getPrettyHearts(player.getHealth() / 2, 10));
+        hologramTrait.setLine(0, Utils.colorize("&a" + Utils.formatTime(secondsLeft * 1000) + "."));
+        hologramTrait.setLine(1, Utils.colorize("&c&lDISCONNECT: &7" + getNPC().getName()));
+        hologramTrait.setLine(2, Utils.colorize(getPrettyHearts(npcPlayer.getHealth() / 2, 10)));
     }
 
+    /**
+     * Generates a visual representation of the NPC's health and absorption using heart icons.
+     *
+     * @param health    The current health in half-hearts.
+     * @param maxHealth The maximum health in half-hearts.
+     * @return A string representing the health status.
+     */
     private String getPrettyHearts(double health, double maxHealth) {
         StringBuilder heartsString = new StringBuilder();
 
@@ -184,6 +244,13 @@ public class CombatLogTrait extends Trait implements Listener {
         return heartsString.toString();
     }
 
+    /**
+     * Calculates the final damage after accounting for armor and toughness.
+     *
+     * @param player The player entity.
+     * @param damage The initial damage.
+     * @return The final damage after reductions.
+     */
     private double calculateFinalDamage(Player player, double damage) {
         double armor = player.getAttribute(Attribute.GENERIC_ARMOR).getValue();
         double toughness = player.getAttribute(Attribute.GENERIC_ARMOR_TOUGHNESS).getValue();
@@ -191,6 +258,9 @@ public class CombatLogTrait extends Trait implements Listener {
         return damage * (1 - (Math.min(20.0, Math.max(armor / 5.0, armor - damage / (2.0 + toughness / 4.0))) / 25.0));
     }
 
+    /**
+     * Despawns and destroys the NPC when the countdown reaches zero.
+     */
     private void despawnNPC() {
         getNPC().despawn();
         getNPC().destroy();

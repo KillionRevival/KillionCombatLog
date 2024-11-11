@@ -1,182 +1,253 @@
 package co.killionrevival.killionCombatLog.listeners;
 
 import co.killionrevival.killionCombatLog.KillionCombatLog;
-import co.killionrevival.killionCombatLog.utils.Utils;
 import co.killionrevival.killionCombatLog.events.PlayerCombatLogEvent;
 import co.killionrevival.killionCombatLog.events.PlayerCombatStateChangedEvent;
+import co.killionrevival.killionCombatLog.utils.Utils;
 import net.citizensnpcs.api.npc.NPC;
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
+import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.entity.ProjectileHitEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.entity.*;
+import org.bukkit.event.player.*;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
+/**
+ * Listener for player-related events to manage combat states and handle combat logging.
+ */
 public class PlayerListener implements Listener {
 
-    private KillionCombatLog plugin;
+    private final KillionCombatLog plugin;
+    private final Map<UUID, BukkitRunnable> countdownTasks = new HashMap<>();
+
+    /**
+     * Constructor to initialize the listener with the main plugin instance.
+     *
+     * @param plugin The main plugin instance.
+     */
     public PlayerListener(KillionCombatLog plugin) {
         this.plugin = plugin;
     }
 
-    private Map<UUID, BukkitRunnable> countdownTasks = new HashMap<>();
-
+    /**
+     * Handles the scenario where a player joins after dying due to combat logging.
+     * Ensures that they experience the consequences appropriately.
+     *
+     * @param event The PlayerJoinEvent.
+     */
     @EventHandler
     public void onAfterDeathJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        if (!plugin.getCombatManager().isPlayerDead(player.getUniqueId()))
+        // Check if the player is marked as dead due to combat logging
+        if (!plugin.getCombatManager().isPlayerDead(player.getUniqueId())) {
             return;
+        }
 
+        // Clear inventory and set health to zero
         player.getInventory().clear();
         player.setHealth(0);
     }
 
+    /**
+     * Handles players who quit the game while in combat.
+     * Triggers the combat logging mechanism.
+     *
+     * @param event The PlayerQuitEvent.
+     */
     @EventHandler
     public void onCombatQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
 
-        if (plugin.getServer().getOnlinePlayers().isEmpty())
+        // If no other players are online, do nothing
+        if (plugin.getServer().getOnlinePlayers().isEmpty()) {
             return;
+        }
 
-        if (!plugin.getCombatManager().isInCombat(player))
+        // If the player is not in combat, do nothing
+        if (!plugin.getCombatManager().isInCombat(player)) {
             return;
+        }
 
+        // Trigger the PlayerCombatLogEvent
         plugin.getServer().getPluginManager().callEvent(new PlayerCombatLogEvent(player));
     }
 
+    /**
+     * Handles players rejoining the game after combat logging.
+     * Restores their state if their NPC is still alive.
+     *
+     * @param event The PlayerJoinEvent.
+     */
     @EventHandler
     public void onCombatLoggerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        if (!plugin.getCombatLogManager().isCombatLogger(player.getUniqueId()))
+        // Check if the player is a combat logger
+        if (!plugin.getCombatLogManager().isCombatLogger(player.getUniqueId())) {
             return;
+        }
 
         UUID npcUniqueId = plugin.getCombatLogManager().getPlayerNPC(player.getUniqueId());
 
         if (npcUniqueId != null) {
             NPC npc = plugin.getNPCManager().getNPC(npcUniqueId);
 
-            if (npc != null) {
+            if (npc != null && npc.getEntity() instanceof Player) {
                 Player npcPlayer = (Player) npc.getEntity();
 
-                if (npcPlayer != null) {
-                    player.setHealth(npcPlayer.getHealth());
-                }
+                // Synchronize health with the NPC
+                player.setHealth(npcPlayer.getHealth());
             }
         }
 
+        // Remove the NPC and update combat state
         plugin.getCombatLogManager().removePlayer(player.getUniqueId());
 
-        if (countdownTasks.containsKey(player.getUniqueId()))
+        if (countdownTasks.containsKey(player.getUniqueId())) {
             plugin.getServer().getPluginManager().callEvent(new PlayerCombatStateChangedEvent(player, true));
+        }
     }
 
+    /**
+     * Handles players who were killed while offline due to their NPC being defeated.
+     * Applies the death consequences upon login.
+     *
+     * @param event The PlayerDeathEvent.
+     */
     @EventHandler
     public void onLoginDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
 
-        if (!plugin.getCombatManager().isPlayerDead(player.getUniqueId()))
+        // Check if the player was marked as dead
+        if (!plugin.getCombatManager().isPlayerDead(player.getUniqueId())) {
             return;
+        }
 
         String killerName = plugin.getCombatManager().getKillerName(player.getUniqueId());
 
         event.setDeathMessage(null);
-        player.sendMessage(Utils.chat("&cYou were killed by &6" + killerName + "&c while logged out."));
+        player.sendMessage(Utils.chatComponent("&cYou were killed by &6" + killerName + "&c while logged out."));
         plugin.getCombatManager().setTimeRemain(player, 0);
         plugin.getCombatManager().setPlayerAsDead(player.getUniqueId(), null, false);
     }
 
+    /**
+     * Removes players from combat upon death.
+     *
+     * @param event The PlayerDeathEvent.
+     */
     @EventHandler
     public void onPlayerKill(PlayerDeathEvent event) {
         Player player = event.getEntity();
         Player killer = player.getKiller();
 
-        if (!plugin.getCombatManager().isInCombat(player) || !plugin.getCombatManager().isInCombat(killer))
-            return;
+        if (plugin.getCombatManager().isInCombat(player)) {
+            plugin.getCombatManager().removePlayer(player);
+        }
 
-        plugin.getCombatManager().removePlayer(player);
-        plugin.getCombatManager().removePlayer(killer);
+        if (killer != null && plugin.getCombatManager().isInCombat(killer)) {
+            plugin.getCombatManager().removePlayer(killer);
+        }
     }
 
+    /**
+     * Adds players to combat when they damage each other directly.
+     *
+     * @param event The EntityDamageByEntityEvent.
+     */
     @EventHandler
     public void onPlayerDamage(EntityDamageByEntityEvent event) {
-        if (!(event.getEntity() instanceof Player) || !(event.getDamager() instanceof Player))
+        if (!(event.getEntity() instanceof Player) || !(event.getDamager() instanceof Player)) {
             return;
+        }
 
-        Player player = (Player) event.getEntity();
+        Player victim = (Player) event.getEntity();
         Player damager = (Player) event.getDamager();
 
-        if (damager.getGameMode().equals(GameMode.CREATIVE)
-                || player.getGameMode().equals(GameMode.CREATIVE) ||
-                player.getGameMode().equals(GameMode.SPECTATOR))
+        // Ignore if either player is in creative or spectator mode
+        if (damager.getGameMode() == GameMode.CREATIVE || victim.getGameMode() == GameMode.CREATIVE ||
+                victim.getGameMode() == GameMode.SPECTATOR) {
             return;
+        }
 
-        plugin.getCombatManager().addPlayer(player);
+        // Add both players to combat
+        plugin.getCombatManager().addPlayer(victim);
         plugin.getCombatManager().addPlayer(damager);
     }
 
+    /**
+     * Adds players to combat when they hit each other with projectiles.
+     *
+     * @param event The ProjectileHitEvent.
+     */
     @EventHandler
     public void onProjectileHit(ProjectileHitEvent event) {
         Projectile projectile = event.getEntity();
 
-        if (!(projectile.getShooter() instanceof Player)
-                || projectile instanceof Snowball || projectile instanceof Egg)
+        if (!(projectile.getShooter() instanceof Player)) {
             return;
+        }
 
-        Player player = (Player) projectile.getShooter();
-
-        if (event.getHitEntity() == null)
+        // Ignore non-damaging projectiles
+        if (projectile instanceof Snowball || projectile instanceof Egg) {
             return;
+        }
 
-        if (!(event.getHitEntity() instanceof Player))
+        Player shooter = (Player) projectile.getShooter();
+
+        if (!(event.getHitEntity() instanceof Player)) {
             return;
+        }
 
-        Player damaged = (Player) event.getHitEntity();
+        Player victim = (Player) event.getHitEntity();
 
-        if (player.getGameMode().equals(GameMode.CREATIVE)
-                || damaged.getGameMode().equals(GameMode.CREATIVE) ||
-                damaged.getGameMode().equals(GameMode.SPECTATOR))
+        // Ignore if either player is in creative or spectator mode
+        if (shooter.getGameMode() == GameMode.CREATIVE || victim.getGameMode() == GameMode.CREATIVE ||
+                victim.getGameMode() == GameMode.SPECTATOR) {
             return;
+        }
 
-        plugin.getCombatManager().addPlayer(player);
-        plugin.getCombatManager().addPlayer(damaged);
+        // Add both players to combat
+        plugin.getCombatManager().addPlayer(shooter);
+        plugin.getCombatManager().addPlayer(victim);
     }
 
+    /**
+     * Updates the action bar messages and countdown timers when a player's combat state changes.
+     *
+     * @param event The PlayerCombatStateChangedEvent.
+     */
     @EventHandler
     public void onCombatStateChanged(PlayerCombatStateChangedEvent event) {
-        Player player = Bukkit.getPlayer(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
         boolean inCombat = event.isInCombat();
 
-        if (player == null)
+        if (player == null) {
             return;
+        }
 
+        // Handle exiting combat
         if (!inCombat) {
             BukkitRunnable existingTask = this.countdownTasks.remove(player.getUniqueId());
             if (existingTask != null) {
                 existingTask.cancel();
             }
-            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(Utils.chat(plugin.getConfig().getString("messages.no-longer"))));
+            player.sendActionBar(Utils.chatComponent(plugin.getConfig().getString("messages.no-longer")));
             return;
         }
 
+        // Handle entering combat
         BukkitRunnable existingTask = this.countdownTasks.get(player.getUniqueId());
         if (existingTask != null) {
             existingTask.cancel();
             this.countdownTasks.remove(player.getUniqueId());
         }
 
+        // Create a new countdown task
         BukkitRunnable countdownTask = new BukkitRunnable() {
             @Override
             public void run() {
@@ -197,10 +268,9 @@ public class PlayerListener implements Listener {
                 }
 
                 String message = plugin.getConfig().getString("messages.in-combat");
-
                 if (message != null) {
                     message = message.replace("%seconds%", String.valueOf(seconds));
-                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(Utils.chat(message)));
+                    player.sendActionBar(Utils.chatComponent(message));
                 }
             }
         };
@@ -208,5 +278,4 @@ public class PlayerListener implements Listener {
         this.countdownTasks.put(player.getUniqueId(), countdownTask);
         countdownTask.runTaskTimer(plugin, 0, 20L);
     }
-
 }
