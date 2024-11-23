@@ -1,6 +1,6 @@
-package co.killionrevival.killionCombatLog.managers;
+package co.killionrevival.killioncombatlog.npc;
 
-import co.killionrevival.killionCombatLog.traits.CombatLogTrait;
+import co.killionrevival.killioncombatlog.npc.traits.CombatLogTrait;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.trait.TraitInfo;
 

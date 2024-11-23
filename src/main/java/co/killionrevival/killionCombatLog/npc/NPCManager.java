@@ -1,6 +1,6 @@
-package co.killionrevival.killionCombatLog.managers;
+package co.killionrevival.killioncombatlog.npc;
 
-import co.killionrevival.killionCombatLog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.KillionCombatLog;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.npc.*;
 import net.citizensnpcs.api.trait.trait.*;

@@ -1,9 +1,10 @@
-package co.killionrevival.killionCombatLog.commands;
+package co.killionrevival.killioncombatlog.core.commands;
 
-import co.killionrevival.killionCombatLog.KillionCombatLog;
-import co.killionrevival.killionCombatLog.utils.Utils;
+import co.killionrevival.killioncombatlog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.util.MessageUtility;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Command executor and tab completer for the /killioncombatlog command.
@@ -32,10 +33,10 @@ public class KCLCommand implements CommandExecutor, TabCompleter {
      * @return True if the command was processed successfully; otherwise, false.
      */
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         // Ensure the sender is a player
         if (!(sender instanceof Player)) {
-            sender.sendMessage(Utils.colorize("&cThis is a player-only command."));
+            sender.sendMessage(MessageUtility.colorize("&cThis is a player-only command."));
             return true;
         }
 
@@ -43,7 +44,7 @@ public class KCLCommand implements CommandExecutor, TabCompleter {
 
         // Check for permission
         if (!player.hasPermission("killioncombatlog.reload")) {
-            player.sendMessage(Utils.colorize("&cYou lack permission to execute this command."));
+            player.sendMessage(MessageUtility.colorize("&cYou lack permission to execute this command."));
             return true;
         }
 
@@ -55,14 +56,11 @@ public class KCLCommand implements CommandExecutor, TabCompleter {
         String action = args[0];
 
         // Handle command actions
-        switch (action.toLowerCase()) {
-            case "reload":
-                plugin.reloadConfig();
-                player.sendMessage(Utils.chatComponent("&aConfiguration reloaded successfully!"));
-                break;
-            default:
-                player.sendMessage(Utils.chatComponent("&cUnknown command. Use /" + label + " reload."));
-                break;
+        if (action.equalsIgnoreCase("reload")) {
+            plugin.reloadConfig();
+            player.sendMessage(MessageUtility.chatComponent("&aConfiguration reloaded successfully!"));
+        } else {
+            player.sendMessage(MessageUtility.chatComponent("&cUnknown command. Use /" + label + " reload."));
         }
 
         return true;
@@ -78,7 +76,7 @@ public class KCLCommand implements CommandExecutor, TabCompleter {
      * @return A list of possible completions for the last argument.
      */
     @Override
-    public java.util.List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
+    public java.util.List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         java.util.List<String> completions = new java.util.ArrayList<>();
 
         // Suggest "reload" if the first argument is being typed

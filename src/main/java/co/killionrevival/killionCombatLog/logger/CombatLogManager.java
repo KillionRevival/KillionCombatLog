@@ -1,6 +1,6 @@
-package co.killionrevival.killionCombatLog.managers;
+package co.killionrevival.killioncombatlog.logger;
 
-import co.killionrevival.killionCombatLog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.KillionCombatLog;
 
 import java.util.HashMap;
 import java.util.Map;

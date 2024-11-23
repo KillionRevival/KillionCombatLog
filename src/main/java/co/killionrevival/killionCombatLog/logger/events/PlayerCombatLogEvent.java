@@ -1,15 +1,23 @@
-package co.killionrevival.killionCombatLog.events;
+package co.killionrevival.killioncombatlog.logger.events;
 
+import lombok.Getter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Event triggered when a player combat logs (disconnects during combat).
  */
+@Getter
 public class PlayerCombatLogEvent extends Event {
 
     private static final HandlerList HANDLERS = new HandlerList();
+    /**
+     * -- GETTER --
+     *  Gets the player who combat logged.
+     *
+     */
     private final Player player;
 
     /**
@@ -21,17 +29,8 @@ public class PlayerCombatLogEvent extends Event {
         this.player = player;
     }
 
-    /**
-     * Gets the player who combat logged.
-     *
-     * @return The player.
-     */
-    public Player getPlayer() {
-        return this.player;
-    }
-
     @Override
-    public HandlerList getHandlers() {
+    public @NotNull HandlerList getHandlers() {
         return HANDLERS;
     }
 

@@ -1,8 +1,8 @@
-package co.killionrevival.killionCombatLog.listeners;
+package co.killionrevival.killioncombatlog.logger.listeners;
 
-import co.killionrevival.killionCombatLog.KillionCombatLog;
-import co.killionrevival.killionCombatLog.events.PlayerCombatLogEvent;
-import co.killionrevival.killionCombatLog.traits.CombatLogTrait;
+import co.killionrevival.killioncombatlog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.logger.events.PlayerCombatLogEvent;
+import co.killionrevival.killioncombatlog.npc.traits.CombatLogTrait;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.trait.HologramTrait;
 import org.bukkit.entity.Player;

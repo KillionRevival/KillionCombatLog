@@ -1,12 +1,17 @@
-package co.killionrevival.killionCombatLog;
+package co.killionrevival.killioncombatlog;
 
-import co.killionrevival.killionCombatLog.commands.KCLCommand;
-import co.killionrevival.killionCombatLog.listeners.CombatLogListener;
-import co.killionrevival.killionCombatLog.listeners.PlayerListener;
-import co.killionrevival.killionCombatLog.managers.*;
-import co.killionrevival.killionCombatLog.utils.Utils;
+import co.killionrevival.killioncombatlog.combat.CombatManager;
+import co.killionrevival.killioncombatlog.core.commands.KCLCommand;
+import co.killionrevival.killioncombatlog.logger.listeners.CombatLogListener;
+import co.killionrevival.killioncombatlog.combat.listeners.CombatListener;
+import co.killionrevival.killioncombatlog.logger.CombatLogManager;
+import co.killionrevival.killioncombatlog.npc.NPCManager;
+import co.killionrevival.killioncombatlog.npc.TraitManager;
+import co.killionrevival.killioncombatlog.util.MessageUtility;
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.Objects;
 
 /**
  * The main class of the KillionCombatLog plugin.
@@ -61,20 +66,20 @@ public final class KillionCombatLog extends JavaPlugin {
      */
     private void registerComponents() {
         // Register event listeners
-        this.getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
+        this.getServer().getPluginManager().registerEvents(new CombatListener(this), this);
         this.getServer().getPluginManager().registerEvents(new CombatLogListener(this), this);
 
         // Register command executors and tab completers
         KCLCommand kclCommand = new KCLCommand(this);
-        this.getCommand("killionCombatLog").setExecutor(kclCommand);
-        this.getCommand("killionCombatLog").setTabCompleter(kclCommand);
+        Objects.requireNonNull(this.getCommand("killionCombatLog")).setExecutor(kclCommand);
+        Objects.requireNonNull(this.getCommand("killionCombatLog")).setTabCompleter(kclCommand);
     }
 
     /**
      * Performs startup routines such as logging plugin activation.
      */
     private void startPlugin() {
-        this.getServer().getConsoleSender().sendMessage(Utils.colorize("[KillionCombatLog] &aPlugin loaded successfully."));
+        this.getServer().getConsoleSender().sendMessage(MessageUtility.colorize("[KillionCombatLog] &aPlugin loaded successfully."));
     }
 
     /**
@@ -82,7 +87,7 @@ public final class KillionCombatLog extends JavaPlugin {
      */
     private void stopPlugin() {
         this.combatManager.close();
-        this.getServer().getConsoleSender().sendMessage(Utils.colorize("[KillionCombatLog] &cPlugin stopped."));
+        this.getServer().getConsoleSender().sendMessage(MessageUtility.colorize("[KillionCombatLog] &cPlugin stopped."));
     }
 
     @Override

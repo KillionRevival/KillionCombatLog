@@ -1,7 +1,8 @@
-package co.killionrevival.killionCombatLog.traits;
+package co.killionrevival.killioncombatlog.npc.traits;
 
-import co.killionrevival.killionCombatLog.KillionCombatLog;
-import co.killionrevival.killionCombatLog.utils.Utils;
+import co.killionrevival.killioncombatlog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.util.MessageUtility;
+import lombok.Setter;
 import net.citizensnpcs.api.event.NPCDamageByEntityEvent;
 import net.citizensnpcs.api.event.NPCDeathEvent;
 import net.citizensnpcs.api.trait.Trait;
@@ -13,6 +14,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.Objects;
+
 /**
  * Custom trait for NPCs representing combat loggers.
  * Manages the NPC's behavior, including damage handling, death, and hologram updates.
@@ -22,6 +25,12 @@ public class CombatLogTrait extends Trait implements Listener {
     private final KillionCombatLog plugin = KillionCombatLog.getPlugin(KillionCombatLog.class);
     private int secondsLeft;
     private double currentAbsorption = 0.0;
+    /**
+     * -- SETTER --
+     *  Sets the parent player of the NPC.
+     *
+     */
+    @Setter
     private Player parentPlayer;
     private BukkitRunnable countdownTask;
     private HologramTrait hologramTrait;
@@ -87,15 +96,6 @@ public class CombatLogTrait extends Trait implements Listener {
 
         String killerName = npcPlayer.getKiller() != null ? npcPlayer.getKiller().getName() : "unknown";
         plugin.getCombatManager().setPlayerAsDead(parentPlayer.getUniqueId(), killerName, true);
-    }
-
-    /**
-     * Sets the parent player of the NPC.
-     *
-     * @param parentPlayer The parent player.
-     */
-    public void setParentPlayer(Player parentPlayer) {
-        this.parentPlayer = parentPlayer;
     }
 
     /**
@@ -214,9 +214,9 @@ public class CombatLogTrait extends Trait implements Listener {
             return;
         }
 
-        hologramTrait.setLine(0, Utils.colorize("&a" + Utils.formatTime(secondsLeft * 1000) + "."));
-        hologramTrait.setLine(1, Utils.colorize("&c&lDISCONNECT: &7" + getNPC().getName()));
-        hologramTrait.setLine(2, Utils.colorize(getPrettyHearts(npcPlayer.getHealth() / 2, 10)));
+        hologramTrait.setLine(0, MessageUtility.colorize("&a" + MessageUtility.formatTime(secondsLeft * 1000L) + "."));
+        hologramTrait.setLine(1, MessageUtility.colorize("&c&lDISCONNECT: &7" + getNPC().getName()));
+        hologramTrait.setLine(2, MessageUtility.colorize(getPrettyHearts(npcPlayer.getHealth() / 2, 10)));
     }
 
     /**
@@ -252,8 +252,8 @@ public class CombatLogTrait extends Trait implements Listener {
      * @return The final damage after reductions.
      */
     private double calculateFinalDamage(Player player, double damage) {
-        double armor = player.getAttribute(Attribute.GENERIC_ARMOR).getValue();
-        double toughness = player.getAttribute(Attribute.GENERIC_ARMOR_TOUGHNESS).getValue();
+        double armor = Objects.requireNonNull(player.getAttribute(Attribute.GENERIC_ARMOR)).getValue();
+        double toughness = Objects.requireNonNull(player.getAttribute(Attribute.GENERIC_ARMOR_TOUGHNESS)).getValue();
 
         return damage * (1 - (Math.min(20.0, Math.max(armor / 5.0, armor - damage / (2.0 + toughness / 4.0))) / 25.0));
     }

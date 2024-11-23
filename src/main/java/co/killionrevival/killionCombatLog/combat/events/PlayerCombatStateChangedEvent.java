@@ -1,16 +1,27 @@
-package co.killionrevival.killionCombatLog.events;
+package co.killionrevival.killioncombatlog.combat.events;
 
+import lombok.Getter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Event triggered when a player's combat state changes (enters or exits combat).
  */
+@Getter
 public class PlayerCombatStateChangedEvent extends Event {
 
     private static final HandlerList HANDLERS = new HandlerList();
+    /**
+     * -- GETTER --
+     *  Gets the player whose combat state changed.
+     */
     private final Player player;
+    /**
+     * -- GETTER --
+     *  Determines if the player is now in combat.
+     */
     private final boolean inCombat;
 
     /**
@@ -24,26 +35,8 @@ public class PlayerCombatStateChangedEvent extends Event {
         this.inCombat = inCombat;
     }
 
-    /**
-     * Gets the player whose combat state changed.
-     *
-     * @return The player.
-     */
-    public Player getPlayer() {
-        return this.player;
-    }
-
-    /**
-     * Determines if the player is now in combat.
-     *
-     * @return True if in combat; false otherwise.
-     */
-    public boolean isInCombat() {
-        return this.inCombat;
-    }
-
     @Override
-    public HandlerList getHandlers() {
+    public @NotNull HandlerList getHandlers() {
         return HANDLERS;
     }
 

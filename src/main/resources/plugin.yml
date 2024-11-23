@@ -1,6 +1,6 @@
 name: KillionCombatLog
 version: '1.0-SNAPSHOT'
-main: co.killionrevival.killionCombatLog.KillionCombatLog
+main: co.killionrevival.killioncombatlog.KillionCombatLog
 authors: [tut, flyerz, Fross]
 api-version: '1.18'
 depend: [WorldGuard, KillionCommons, Citizens]

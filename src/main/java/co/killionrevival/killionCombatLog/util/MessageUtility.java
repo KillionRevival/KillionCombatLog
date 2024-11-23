@@ -1,4 +1,4 @@
-package co.killionrevival.killionCombatLog.utils;
+package co.killionrevival.killioncombatlog.util;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -6,7 +6,7 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 /**
  * Utility class providing helper methods for text formatting and time conversion.
  */
-public class Utils {
+public class MessageUtility {
 
     /**
      * Converts a string with legacy color codes (e.g., '&a') into a Component.
@@ -60,14 +60,14 @@ public class Utils {
         }
 
         if (minutes > 0) {
-            if (timeString.length() > 0) {
+            if (!timeString.isEmpty()) {
                 timeString.append(", ");
             }
             timeString.append(minutes).append(" minutes");
         }
 
         if (seconds > 0) {
-            if (timeString.length() > 0) {
+            if (!timeString.isEmpty()) {
                 timeString.append(", ");
             }
             timeString.append(seconds).append(" seconds");

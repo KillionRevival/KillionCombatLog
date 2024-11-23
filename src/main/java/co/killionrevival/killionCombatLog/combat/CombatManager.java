@@ -1,7 +1,7 @@
-package co.killionrevival.killionCombatLog.managers;
+package co.killionrevival.killioncombatlog.combat;
 
-import co.killionrevival.killionCombatLog.KillionCombatLog;
-import co.killionrevival.killionCombatLog.events.PlayerCombatStateChangedEvent;
+import co.killionrevival.killioncombatlog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.combat.events.PlayerCombatStateChangedEvent;
 import org.bukkit.entity.Player;
 
 import java.io.File;

@@ -1,9 +1,9 @@
-package co.killionrevival.killionCombatLog.listeners;
+package co.killionrevival.killioncombatlog.combat.listeners;
 
-import co.killionrevival.killionCombatLog.KillionCombatLog;
-import co.killionrevival.killionCombatLog.events.PlayerCombatLogEvent;
-import co.killionrevival.killionCombatLog.events.PlayerCombatStateChangedEvent;
-import co.killionrevival.killionCombatLog.utils.Utils;
+import co.killionrevival.killioncombatlog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.logger.events.PlayerCombatLogEvent;
+import co.killionrevival.killioncombatlog.combat.events.PlayerCombatStateChangedEvent;
+import co.killionrevival.killioncombatlog.util.MessageUtility;
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.*;
 import org.bukkit.entity.*;
@@ -18,7 +18,7 @@ import java.util.*;
 /**
  * Listener for player-related events to manage combat states and handle combat logging.
  */
-public class PlayerListener implements Listener {
+public class CombatListener implements Listener {
 
     private final KillionCombatLog plugin;
     private final Map<UUID, BukkitRunnable> countdownTasks = new HashMap<>();
@@ -28,7 +28,7 @@ public class PlayerListener implements Listener {
      *
      * @param plugin The main plugin instance.
      */
-    public PlayerListener(KillionCombatLog plugin) {
+    public CombatListener(KillionCombatLog plugin) {
         this.plugin = plugin;
     }
 
@@ -96,8 +96,7 @@ public class PlayerListener implements Listener {
         if (npcUniqueId != null) {
             NPC npc = plugin.getNPCManager().getNPC(npcUniqueId);
 
-            if (npc != null && npc.getEntity() instanceof Player) {
-                Player npcPlayer = (Player) npc.getEntity();
+            if (npc != null && npc.getEntity() instanceof Player npcPlayer) {
 
                 // Synchronize health with the NPC
                 player.setHealth(npcPlayer.getHealth());
@@ -114,7 +113,7 @@ public class PlayerListener implements Listener {
 
     /**
      * Handles players who were killed while offline due to their NPC being defeated.
-     * Applies the death consequences upon login.
+     * Applies the death consequences on login.
      *
      * @param event The PlayerDeathEvent.
      */
@@ -130,7 +129,7 @@ public class PlayerListener implements Listener {
         String killerName = plugin.getCombatManager().getKillerName(player.getUniqueId());
 
         event.setDeathMessage(null);
-        player.sendMessage(Utils.chatComponent("&cYou were killed by &6" + killerName + "&c while logged out."));
+        player.sendMessage(MessageUtility.chatComponent("&cYou were killed by &6" + killerName + "&c while logged out."));
         plugin.getCombatManager().setTimeRemain(player, 0);
         plugin.getCombatManager().setPlayerAsDead(player.getUniqueId(), null, false);
     }
@@ -161,12 +160,9 @@ public class PlayerListener implements Listener {
      */
     @EventHandler
     public void onPlayerDamage(EntityDamageByEntityEvent event) {
-        if (!(event.getEntity() instanceof Player) || !(event.getDamager() instanceof Player)) {
+        if (!(event.getEntity() instanceof Player victim) || !(event.getDamager() instanceof Player damager)) {
             return;
         }
-
-        Player victim = (Player) event.getEntity();
-        Player damager = (Player) event.getDamager();
 
         // Ignore if either player is in creative or spectator mode
         if (damager.getGameMode() == GameMode.CREATIVE || victim.getGameMode() == GameMode.CREATIVE ||
@@ -188,7 +184,7 @@ public class PlayerListener implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Projectile projectile = event.getEntity();
 
-        if (!(projectile.getShooter() instanceof Player)) {
+        if (!(projectile.getShooter() instanceof Player shooter)) {
             return;
         }
 
@@ -197,13 +193,9 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        Player shooter = (Player) projectile.getShooter();
-
-        if (!(event.getHitEntity() instanceof Player)) {
+        if (!(event.getHitEntity() instanceof Player victim)) {
             return;
         }
-
-        Player victim = (Player) event.getHitEntity();
 
         // Ignore if either player is in creative or spectator mode
         if (shooter.getGameMode() == GameMode.CREATIVE || victim.getGameMode() == GameMode.CREATIVE ||
@@ -236,7 +228,7 @@ public class PlayerListener implements Listener {
             if (existingTask != null) {
                 existingTask.cancel();
             }
-            player.sendActionBar(Utils.chatComponent(plugin.getConfig().getString("messages.no-longer")));
+            player.sendActionBar(MessageUtility.chatComponent(plugin.getConfig().getString("messages.no-longer")));
             return;
         }
 
@@ -270,7 +262,7 @@ public class PlayerListener implements Listener {
                 String message = plugin.getConfig().getString("messages.in-combat");
                 if (message != null) {
                     message = message.replace("%seconds%", String.valueOf(seconds));
-                    player.sendActionBar(Utils.chatComponent(message));
+                    player.sendActionBar(MessageUtility.chatComponent(message));
                 }
             }
         };
