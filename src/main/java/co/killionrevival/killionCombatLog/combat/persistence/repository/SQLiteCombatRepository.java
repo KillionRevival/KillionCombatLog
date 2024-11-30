@@ -1,6 +1,7 @@
 package co.killionrevival.killioncombatlog.combat.persistence.repository;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.util.LogUtil;
 import lombok.extern.java.Log;
 
 import java.io.File;
@@ -8,7 +9,6 @@ import java.sql.*;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.logging.Level;
 
 /**
  * SQLite implementation of the ICombatStateRepository.
@@ -50,29 +50,31 @@ public class SQLiteCombatRepository implements ICombatStateRepository {
      * @throws SQLException if database initialization fails
      */
     public SQLiteCombatRepository(KillionCombatLog plugin) throws SQLException {
+        LogUtil.info("Initializing combat database connection...");
         File dbFile = new File(plugin.getDataFolder(), "combat_data.db");
         boolean needsInit = !dbFile.exists();
 
         try {
-            // Ensure plugin directory exists
             if (!dbFile.getParentFile().exists()) {
+                LogUtil.debug("Creating plugin data folder");
                 dbFile.getParentFile().mkdirs();
             }
 
-            // Initialize connection
+            LogUtil.debug(String.format("Connecting to SQLite database: %s", dbFile.getAbsolutePath()));
             connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
             connection.setAutoCommit(true);
 
-            // Create tables if needed
             if (needsInit) {
+                LogUtil.info("First run detected, creating database tables...");
                 try (Statement stmt = connection.createStatement()) {
                     stmt.execute(CREATE_TABLE_SQL);
                 }
+                LogUtil.info("Database tables created successfully");
             }
 
-            log.info("Combat database initialized successfully");
+            LogUtil.info("Combat database initialized successfully");
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to initialize combat database", e);
+            LogUtil.error("Failed to initialize combat database", e);
             throw e;
         }
     }
@@ -85,8 +87,10 @@ public class SQLiteCombatRepository implements ICombatStateRepository {
             stmt.setString(3, location);
             stmt.setLong(4, System.currentTimeMillis());
             stmt.executeUpdate();
+            LogUtil.debug(String.format("Saved death record: Player=%s, Killer=%s, Location=%s",
+                playerUUID, killerName, location));
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to save player death record", e);
+            LogUtil.error("Failed to save player death record", e);
         }
     }
 
@@ -97,16 +101,18 @@ public class SQLiteCombatRepository implements ICombatStateRepository {
 
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(DeathRecord.builder()
+                    DeathRecord record = DeathRecord.builder()
                             .playerUUID(playerUUID)
                             .killerName(rs.getString("KillerName"))
                             .location(rs.getString("Location"))
                             .timestamp(Instant.ofEpochMilli(rs.getLong("DeathTimestamp")))
-                            .build());
+                            .build();
+                    LogUtil.debug(String.format("Retrieved death record for player %s", playerUUID));
+                    return Optional.of(record);
                 }
             }
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to retrieve death record", e);
+            LogUtil.error("Failed to retrieve death record", e);
         }
         return Optional.empty();
     }
@@ -115,9 +121,11 @@ public class SQLiteCombatRepository implements ICombatStateRepository {
     public void removeDeathRecord(UUID playerUUID) {
         try (PreparedStatement stmt = connection.prepareStatement(DELETE_DEATH_SQL)) {
             stmt.setString(1, playerUUID.toString());
-            stmt.executeUpdate();
+            int affected = stmt.executeUpdate();
+            LogUtil.debug(String.format("Removed death record for player %s: %d rows affected",
+                playerUUID, affected));
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to remove death record", e);
+            LogUtil.error("Failed to remove death record", e);
         }
     }
 
@@ -126,10 +134,13 @@ public class SQLiteCombatRepository implements ICombatStateRepository {
         try (PreparedStatement stmt = connection.prepareStatement(COUNT_DEATH_SQL)) {
             stmt.setString(1, playerUUID.toString());
             try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next() && rs.getInt(1) > 0;
+                boolean hasRecord = rs.next() && rs.getInt(1) > 0;
+                LogUtil.debug(String.format("Checked death record existence for player %s: %s",
+                    playerUUID, hasRecord));
+                return hasRecord;
             }
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to check death record existence", e);
+            LogUtil.error("Failed to check death record existence", e);
             return false;
         }
     }
@@ -138,9 +149,11 @@ public class SQLiteCombatRepository implements ICombatStateRepository {
     public int cleanupOldRecords(long maxAgeMillis) {
         try (PreparedStatement stmt = connection.prepareStatement(CLEANUP_OLD_SQL)) {
             stmt.setLong(1, System.currentTimeMillis() - maxAgeMillis);
-            return stmt.executeUpdate();
+            int removed = stmt.executeUpdate();
+            LogUtil.info(String.format("Cleaned up %d old death records", removed));
+            return removed;
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to cleanup old records", e);
+            LogUtil.error("Failed to cleanup old records", e);
             return 0;
         }
     }
@@ -149,10 +162,12 @@ public class SQLiteCombatRepository implements ICombatStateRepository {
     public void close() {
         try {
             if (connection != null && !connection.isClosed()) {
+                LogUtil.debug("Closing database connection");
                 connection.close();
+                LogUtil.info("Combat database connection closed successfully");
             }
         } catch (SQLException e) {
-            log.log(Level.SEVERE, "Failed to close combat database", e);
+            LogUtil.error("Failed to close combat database", e);
         }
     }
 }

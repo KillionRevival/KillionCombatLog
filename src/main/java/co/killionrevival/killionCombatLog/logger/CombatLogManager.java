@@ -1,6 +1,7 @@
 package co.killionrevival.killioncombatlog.logger;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.util.LogUtil;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,6 +23,7 @@ public class CombatLogManager {
      */
     public CombatLogManager(KillionCombatLog plugin) {
         this.plugin = plugin;
+        LogUtil.info("Combat Log Manager initialized");
     }
 
     /**
@@ -32,6 +34,8 @@ public class CombatLogManager {
      */
     public void addPlayer(UUID playerUniqueId, UUID npcUniqueId) {
         this.combatLoggers.put(playerUniqueId, npcUniqueId);
+        LogUtil.combat(String.format("Added combat logger: Player UUID=%s, NPC UUID=%s",
+            playerUniqueId, npcUniqueId));
     }
 
     /**
@@ -41,11 +45,16 @@ public class CombatLogManager {
      */
     public void removePlayer(UUID playerUniqueId) {
         if (!this.isCombatLogger(playerUniqueId)) {
+            LogUtil.debug(String.format("Attempted to remove non-existent combat logger: %s", playerUniqueId));
             return;
         }
 
-        plugin.getNPCManager().removeNPC(this.combatLoggers.get(playerUniqueId));
+        LogUtil.combat(String.format("Removing combat logger: Player UUID=%s", playerUniqueId));
+        UUID npcUUID = this.combatLoggers.get(playerUniqueId);
+        plugin.getNPCManager().removeNPC(npcUUID);
         this.combatLoggers.remove(playerUniqueId);
+        LogUtil.debug(String.format("Successfully removed combat logger and associated NPC: Player=%s, NPC=%s",
+            playerUniqueId, npcUUID));
     }
 
     /**
@@ -55,7 +64,10 @@ public class CombatLogManager {
      * @return True if the player is a combat logger; false otherwise.
      */
     public boolean isCombatLogger(UUID playerUniqueId) {
-        return this.combatLoggers.containsKey(playerUniqueId) && this.combatLoggers.get(playerUniqueId) != null;
+        boolean isLogger = this.combatLoggers.containsKey(playerUniqueId) &&
+                          this.combatLoggers.get(playerUniqueId) != null;
+        LogUtil.debug(String.format("Checked combat logger status for %s: %s", playerUniqueId, isLogger));
+        return isLogger;
     }
 
     /**
@@ -65,6 +77,8 @@ public class CombatLogManager {
      * @return The UUID of the NPC.
      */
     public UUID getPlayerNPC(UUID playerUniqueId) {
-        return this.combatLoggers.get(playerUniqueId);
+        UUID npcUUID = this.combatLoggers.get(playerUniqueId);
+        LogUtil.debug(String.format("Retrieved NPC UUID for player %s: %s", playerUniqueId, npcUUID));
+        return npcUUID;
     }
 }

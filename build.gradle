@@ -49,7 +49,7 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok:1.18.34'
 
     // WorldGuard API
-    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.9'
+    implementation 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
 
     // KillionCommons library
     implementation 'co.killionrevival:killioncommons:2.0.0-SNAPSHOT'

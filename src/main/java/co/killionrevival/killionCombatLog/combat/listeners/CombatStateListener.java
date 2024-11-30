@@ -2,6 +2,7 @@ package co.killionrevival.killioncombatlog.combat.listeners;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.combat.rules.CombatResult;
+import co.killionrevival.killioncombatlog.util.LogUtil;
 import co.killionrevival.killioncombatlog.util.MessageUtility;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.entity.Player;
@@ -24,11 +25,13 @@ public class CombatStateListener implements Listener {
      */
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerDamage(EntityDamageByEntityEvent event) {
+        LogUtil.debug("Processing EntityDamageByEntityEvent for combat evaluation");
         CombatResult result = plugin.getCombatManager().getRuleEngine().evaluateEvent(event);
 
         if (result.isShouldEnterCombat()) {
             for (Player combatant : result.getCombatants()) {
                 plugin.getCombatManager().addPlayer(combatant);
+                LogUtil.combat(String.format("Player %s entered combat due to direct damage", combatant.getName()));
 
                 String message = plugin.getConfig().getString(
                         "messages.combat-engaged",
@@ -36,6 +39,8 @@ public class CombatStateListener implements Listener {
                 );
                 combatant.sendMessage(MessageUtility.chatComponent(message));
             }
+        } else {
+            LogUtil.debug("Combat not initiated: " + result.getReason());
         }
     }
 
@@ -44,11 +49,13 @@ public class CombatStateListener implements Listener {
      */
     @EventHandler(priority = EventPriority.NORMAL)
     public void onProjectileHit(ProjectileHitEvent event) {
+        LogUtil.debug("Processing ProjectileHitEvent for combat evaluation");
         CombatResult result = plugin.getCombatManager().getRuleEngine().evaluateEvent(event);
 
         if (result.isShouldEnterCombat()) {
             for (Player combatant : result.getCombatants()) {
                 plugin.getCombatManager().addPlayer(combatant);
+                LogUtil.combat(String.format("Player %s entered combat due to projectile combat", combatant.getName()));
 
                 String message = plugin.getConfig().getString(
                         "messages.combat-engaged-projectile",
@@ -56,6 +63,8 @@ public class CombatStateListener implements Listener {
                 );
                 combatant.sendMessage(MessageUtility.chatComponent(message));
             }
+        } else {
+            LogUtil.debug("Projectile combat not initiated: " + result.getReason());
         }
     }
 }
