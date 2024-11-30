@@ -1,217 +1,149 @@
 package co.killionrevival.killioncombatlog.combat;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
-import co.killionrevival.killioncombatlog.combat.events.PlayerCombatStateChangedEvent;
+import co.killionrevival.killioncombatlog.combat.state.CombatStateManager;
+import co.killionrevival.killioncombatlog.combat.persistence.CombatPersistenceManager;
+import co.killionrevival.killioncombatlog.combat.rules.CombatRuleEngine;
+import lombok.Getter;
 import org.bukkit.entity.Player;
 
-import java.io.File;
-import java.sql.*;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 /**
- * Manages the combat states of players and handles persistence for players who die due to combat logging.
- * Uses an SQLite database to store data across server restarts.
+ * Main combat management facade that coordinates between state, persistence, and rules.
  */
+@Getter
 public class CombatManager {
 
-    private final Map<UUID, Integer> combat = new HashMap<>();
     private final KillionCombatLog plugin;
-    private Connection connection;
+    private final CombatStateManager stateManager;
+    private final CombatPersistenceManager persistenceManager;
+    /**
+     * -- GETTER --
+     *  Gets the combat rule engine instance.
+     *
+     */
+    @Getter
+    private final CombatRuleEngine ruleEngine;
 
     /**
-     * Constructor to initialize the manager with the main plugin instance.
-     * Sets up the database connection.
+     * Constructor to initialize the combat management system.
      *
-     * @param plugin The main plugin instance.
+     * @param plugin The main plugin instance
      */
     public CombatManager(KillionCombatLog plugin) {
         this.plugin = plugin;
-        this.setupDatabase();
+        this.stateManager = new CombatStateManager(plugin);
+        this.persistenceManager = new CombatPersistenceManager(plugin);
+        this.ruleEngine = new CombatRuleEngine(plugin);
     }
 
     /**
-     * Sets up the SQLite database for storing player death information.
-     */
-    private void setupDatabase() {
-        try {
-            File dbFile = new File(plugin.getDataFolder(), "deadplayers.db");
-            if (!dbFile.exists()) {
-                dbFile.createNewFile();
-            }
-            connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
-            try (PreparedStatement stmt = connection.prepareStatement(
-                    "CREATE TABLE IF NOT EXISTS dead_players (UUID TEXT PRIMARY KEY, KillerName TEXT)")) {
-                stmt.executeUpdate();
-            }
-            plugin.getLogger().info("Database setup completed successfully.");
-        } catch (Exception e) {
-            plugin.getLogger().severe("Database setup failed: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Closes the database connection when the plugin is disabled.
-     */
-    public void close() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Marks a player as dead or alive in the database.
-     * This method is asynchronous to prevent blocking the main server thread.
+     * Adds a player to combat.
      *
-     * @param playerUUID The UUID of the player.
-     * @param killerName The name of the killer, if applicable.
-     * @param isDead     True to mark the player as dead; false to mark as alive.
-     */
-    public void setPlayerAsDead(UUID playerUUID, String killerName, boolean isDead) {
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            try (PreparedStatement stmt = isDead
-                    ? connection.prepareStatement("INSERT OR REPLACE INTO dead_players (UUID, KillerName) VALUES (?, ?)")
-                    : connection.prepareStatement("DELETE FROM dead_players WHERE UUID = ?")) {
-                stmt.setString(1, playerUUID.toString());
-                if (isDead) {
-                    stmt.setString(2, killerName);
-                }
-                stmt.executeUpdate();
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        });
-    }
-
-    /**
-     * Checks if a player is marked as dead in the database.
-     *
-     * @param playerUUID The UUID of the player.
-     * @return True if the player is marked as dead; false otherwise.
-     */
-    public boolean isPlayerDead(UUID playerUUID) {
-        try (PreparedStatement stmt = connection.prepareStatement("SELECT COUNT(*) FROM dead_players WHERE UUID = ?")) {
-            stmt.setString(1, playerUUID.toString());
-            try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next() && rs.getInt(1) > 0;
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
-
-    /**
-     * Retrieves the killer's name for a player who died while offline.
-     *
-     * @param playerUUID The UUID of the player.
-     * @return The killer's name, or null if not found.
-     */
-    public String getKillerName(UUID playerUUID) {
-        try (PreparedStatement stmt = connection.prepareStatement("SELECT KillerName FROM dead_players WHERE UUID = ?")) {
-            stmt.setString(1, playerUUID.toString());
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getString("KillerName");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    /**
-     * Adds a player to the combat list and resets their combat timer.
-     *
-     * @param player The player to add.
+     * @param player The player to add
      */
     public void addPlayer(Player player) {
-        UUID playerId = player.getUniqueId();
-        int combatDuration = plugin.getConfig().getInt("settings.combat-tag-duration");
-
-        if (combat.containsKey(playerId)) {
-            this.resetTimeRemain(player);
-            return;
-        }
-
-        combat.put(playerId, combatDuration);
-        plugin.getServer().getPluginManager().callEvent(new PlayerCombatStateChangedEvent(player, true));
+        stateManager.enterCombat(player);
     }
 
     /**
-     * Removes a player from the combat list and triggers a state change event.
+     * Removes a player from combat.
      *
-     * @param player The player to remove.
+     * @param player The player to remove
      */
     public void removePlayer(Player player) {
-        if (!combat.containsKey(player.getUniqueId())) {
-            return;
-        }
-
-        combat.remove(player.getUniqueId());
-        plugin.getServer().getPluginManager().callEvent(new PlayerCombatStateChangedEvent(player, false));
+        stateManager.exitCombat(player);
     }
 
     /**
-     * Checks if a player is currently in combat.
+     * Checks if a player is in combat.
      *
-     * @param player The player to check.
-     * @return True if the player is in combat; false otherwise.
+     * @param player The player to check
+     * @return true if the player is in combat
      */
     public boolean isInCombat(Player player) {
-        return player != null && combat.containsKey(player.getUniqueId());
+        return stateManager.isInCombat(player);
     }
 
     /**
      * Gets the remaining combat time for a player.
      *
-     * @param player The player to check.
-     * @return The remaining time in seconds, or -1 if not in combat.
+     * @param player The player to check
+     * @return The remaining time in seconds, or -1 if not in combat
      */
     public int getTimeRemain(Player player) {
-        return player != null ? combat.getOrDefault(player.getUniqueId(), -1) : -1;
+        return stateManager.getRemainingTime(player);
     }
 
     /**
-     * Resets the combat timer for a player.
+     * Resets a player's combat timer.
      *
-     * @param player The player whose timer to reset.
+     * @param player The player whose timer to reset
      */
     public void resetTimeRemain(Player player) {
-        if (player == null) {
-            return;
-        }
-
-        int combatDuration = plugin.getConfig().getInt("settings.combat-tag-duration");
-        combat.put(player.getUniqueId(), combatDuration);
-        plugin.getServer().getPluginManager().callEvent(new PlayerCombatStateChangedEvent(player, true));
+        stateManager.resetCombatTimer(player);
     }
 
     /**
-     * Decreases the combat timer for a player by one second.
+     * Sets a player's combat timer to a specific value.
      *
-     * @param player The player whose timer to decrease.
-     */
-    public void decreaseTimeRemain(Player player) {
-        UUID playerId = player.getUniqueId();
-        int seconds = combat.getOrDefault(playerId, 0);
-        combat.put(playerId, seconds - 1);
-    }
-
-    /**
-     * Sets the combat timer for a player to a specific value.
-     *
-     * @param player The player whose timer to set.
-     * @param time   The time in seconds to set.
+     * @param player The player whose timer to set
+     * @param time The time in seconds
      */
     public void setTimeRemain(Player player, int time) {
-        combat.put(player.getUniqueId(), time);
+        stateManager.setCombatTime(player, time);
+    }
+
+    /**
+     * Marks a player as dead or alive in the persistence system.
+     *
+     * @param playerUUID The UUID of the player
+     * @param killerName The name of the killer
+     * @param isDead Whether the player should be marked as dead
+     */
+    public void setPlayerAsDead(UUID playerUUID, String killerName, boolean isDead) {
+        if (isDead) {
+            persistenceManager.recordPlayerDeath(playerUUID, killerName);
+        } else {
+            persistenceManager.removeDeathRecord(playerUUID);
+        }
+    }
+
+    /**
+     * Checks if a player is marked as dead in the persistence system.
+     *
+     * @param playerUUID The UUID of the player
+     * @return true if the player is marked as dead
+     */
+    public boolean isPlayerDead(UUID playerUUID) {
+        return persistenceManager.hasDeathRecord(playerUUID);
+    }
+
+    /**
+     * Gets the killer's name for a dead player.
+     *
+     * @param playerUUID The UUID of the dead player
+     * @return The killer's name, or null if not found
+     */
+    public String getKillerName(UUID playerUUID) {
+        return persistenceManager.getKillerName(playerUUID);
+    }
+
+    /**
+     * Performs cleanup when the plugin is disabled.
+     */
+    public void close() {
+        stateManager.shutdown();
+        persistenceManager.shutdown();
+    }
+
+    /**
+     * Enables or disables debug mode for the combat system.
+     *
+     * @param debug Whether to enable debug mode
+     */
+    public void setDebugMode(boolean debug) {
+        ruleEngine.setDebug(debug);
     }
 }

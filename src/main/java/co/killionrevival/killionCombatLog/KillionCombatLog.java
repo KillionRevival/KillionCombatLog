@@ -1,9 +1,10 @@
 package co.killionrevival.killioncombatlog;
 
 import co.killionrevival.killioncombatlog.combat.CombatManager;
+import co.killionrevival.killioncombatlog.combat.listeners.CombatDeathListener;
+import co.killionrevival.killioncombatlog.combat.listeners.CombatDisconnectListener;
+import co.killionrevival.killioncombatlog.combat.listeners.CombatStateListener;
 import co.killionrevival.killioncombatlog.core.commands.KCLCommand;
-import co.killionrevival.killioncombatlog.logger.listeners.CombatLogListener;
-import co.killionrevival.killioncombatlog.combat.listeners.CombatListener;
 import co.killionrevival.killioncombatlog.logger.CombatLogManager;
 import co.killionrevival.killioncombatlog.npc.NPCManager;
 import co.killionrevival.killioncombatlog.npc.TraitManager;
@@ -56,7 +57,7 @@ public final class KillionCombatLog extends JavaPlugin {
         // Initialize manager instances
         this.combatManager = new CombatManager(this);
         this.combatLogManager = new CombatLogManager(this);
-        this.traitManager = new TraitManager(); // Updated to match constructor
+        this.traitManager = new TraitManager();
         this.npcManager = new NPCManager(this);
     }
 
@@ -65,14 +66,18 @@ public final class KillionCombatLog extends JavaPlugin {
      * Ensures that the plugin responds to game events and player commands appropriately.
      */
     private void registerComponents() {
-        // Register event listeners
-        this.getServer().getPluginManager().registerEvents(new CombatListener(this), this);
-        this.getServer().getPluginManager().registerEvents(new CombatLogListener(this), this);
+        // Register combat-specific listeners
+        this.getServer().getPluginManager().registerEvents(new CombatStateListener(this), this);
+        this.getServer().getPluginManager().registerEvents(new CombatDeathListener(this), this);
+        this.getServer().getPluginManager().registerEvents(new CombatDisconnectListener(this), this);
+
+        // Register logger package listener
+        this.getServer().getPluginManager().registerEvents(new co.killionrevival.killioncombatlog.logger.listeners.CombatLogListener(this), this);
 
         // Register command executors and tab completers
         KCLCommand kclCommand = new KCLCommand(this);
-        Objects.requireNonNull(this.getCommand("killionCombatLog")).setExecutor(kclCommand);
-        Objects.requireNonNull(this.getCommand("killionCombatLog")).setTabCompleter(kclCommand);
+        Objects.requireNonNull(this.getCommand("killioncombatlog")).setExecutor(kclCommand);
+        Objects.requireNonNull(this.getCommand("killioncombatlog")).setTabCompleter(kclCommand);
     }
 
     /**
@@ -86,8 +91,12 @@ public final class KillionCombatLog extends JavaPlugin {
      * Performs shutdown routines such as closing database connections.
      */
     private void stopPlugin() {
-        this.combatManager.close();
-        this.getServer().getConsoleSender().sendMessage(MessageUtility.colorize("[KillionCombatLog] &cPlugin stopped."));
+        if (this.combatManager != null) {
+            this.combatManager.close(); // This will also shut down the CombatTimerManager
+        }
+        this.getServer().getConsoleSender().sendMessage(
+            MessageUtility.colorize("[KillionCombatLog] &cPlugin stopped.")
+        );
     }
 
     @Override

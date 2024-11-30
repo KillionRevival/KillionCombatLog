@@ -35,12 +35,10 @@ public class KCLCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         // Ensure the sender is a player
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage(MessageUtility.colorize("&cThis is a player-only command."));
             return true;
         }
-
-        Player player = (Player) sender;
 
         // Check for permission
         if (!player.hasPermission("killioncombatlog.reload")) {
