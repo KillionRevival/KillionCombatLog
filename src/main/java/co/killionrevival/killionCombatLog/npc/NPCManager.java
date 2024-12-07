@@ -7,6 +7,7 @@ import net.citizensnpcs.api.npc.*;
 import net.citizensnpcs.api.trait.trait.*;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.attribute.Attribute;
 
 import java.util.UUID;
 
@@ -45,6 +46,19 @@ public class NPCManager {
         NPC npc = npcRegistry.createNPC(player.getType(), player.getName());
         npc.spawn(player.getLocation());
         LogUtil.debug("NPC spawned successfully");
+
+        // Set the NPC's health to match the player's current health
+        if (npc.getEntity() instanceof Player npcPlayer) {
+            // Set max health first to ensure the NPC can hold the same amount of health
+            double maxHealth = player.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue();
+            npcPlayer.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
+
+            // Set current health to match player's
+            double currentHealth = player.getHealth();
+            npcPlayer.setHealth(currentHealth);
+
+            LogUtil.debug(String.format("Set NPC health to %s/%s", currentHealth, maxHealth));
+        }
 
         // Configure movement speed
         npc.getNavigator().getDefaultParameters().baseSpeed(0.8f);

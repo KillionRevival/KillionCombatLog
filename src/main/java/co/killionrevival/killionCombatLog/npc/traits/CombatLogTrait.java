@@ -2,6 +2,7 @@ package co.killionrevival.killioncombatlog.npc.traits;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.util.MessageUtility;
+import lombok.Getter;
 import lombok.Setter;
 import net.citizensnpcs.api.event.NPCDamageByEntityEvent;
 import net.citizensnpcs.api.event.NPCDeathEvent;
@@ -23,15 +24,9 @@ import java.util.Objects;
 public class CombatLogTrait extends Trait implements Listener {
 
     private final KillionCombatLog plugin = KillionCombatLog.getPlugin(KillionCombatLog.class);
-    private int secondsLeft;
+    @Getter private int secondsLeft;
     private double currentAbsorption = 0.0;
-    /**
-     * -- SETTER --
-     *  Sets the parent player of the NPC.
-     *
-     */
-    @Setter
-    private Player parentPlayer;
+    @Setter private Player parentPlayer;
     private BukkitRunnable countdownTask;
     private HologramTrait hologramTrait;
 
@@ -40,12 +35,19 @@ public class CombatLogTrait extends Trait implements Listener {
      */
     public CombatLogTrait() {
         super("CombatLogTrait");
-        this.secondsLeft = plugin.getConfig().getInt("settings.npc-lifetime-seconds");
+    }
+
+    /**
+     * Sets the initial combat timer duration for the NPC.
+     * Should be called with the player's remaining combat time when creating the NPC.
+     */
+    public void setInitialTimer(int remainingSeconds) {
+        this.secondsLeft = remainingSeconds;
+        startCountdown();
     }
 
     @Override
     public void onAttach() {
-        startCountdown();
         setupHologram();
     }
 

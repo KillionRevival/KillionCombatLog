@@ -36,6 +36,9 @@ public class CombatLogListener implements Listener {
     public void onCombatLog(PlayerCombatLogEvent event) {
         Player player = event.getPlayer();
 
+        // Get the remaining combat time before creating the NPC
+        int remainingTime = plugin.getCombatManager().getTimeRemain(player);
+
         // Create an NPC representing the player
         NPC npc = plugin.getNPCManager().createNPC(player);
 
@@ -43,6 +46,8 @@ public class CombatLogListener implements Listener {
         CombatLogTrait combatLogTrait = npc.getOrAddTrait(CombatLogTrait.class);
         combatLogTrait.setParentPlayer(player);
         combatLogTrait.setAbsorption(player.getAbsorptionAmount());
+        // Set the actual remaining combat time
+        combatLogTrait.setInitialTimer(remainingTime);
 
         npc.getOrAddTrait(HologramTrait.class);
 

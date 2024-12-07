@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'co.killionrevival'
-version = '1.0-SNAPSHOT'
+version = '1.0.1'
 description = 'KillionRevival Combat Logging Plugin'
 
 def targetJavaVersion = 21
@@ -52,13 +52,13 @@ dependencies {
     implementation 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
 
     // KillionCommons library
-    implementation 'co.killionrevival:killioncommons:2.0.0-SNAPSHOT'
+    implementation 'co.killionrevival:killioncommons:2.0.1-SNAPSHOT'
 
     // SQLite JDBC driver
     implementation 'org.xerial:sqlite-jdbc:3.46.0.0'
 
     // Citizens API with exclusions
-    compileOnly('net.citizensnpcs:citizens-main:2.0.35-SNAPSHOT') {
+    compileOnly('net.citizensnpcs:citizens-main:2.0.36-SNAPSHOT') {
         exclude group: '*', module: '*'
     }
 }
@@ -91,7 +91,5 @@ processResources {
 }
 
 shadowJar {
-    // Configuration to match Maven Shade Plugin behavior
-    minimize() // Optional: Minimize the JAR file size
-    // Additional configurations can be added here
+    minimize()
 }

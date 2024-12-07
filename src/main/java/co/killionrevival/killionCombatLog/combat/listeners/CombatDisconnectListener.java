@@ -3,6 +3,7 @@ package co.killionrevival.killioncombatlog.combat.listeners;
 import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.combat.events.PlayerCombatStateChangedEvent;
 import co.killionrevival.killioncombatlog.logger.events.PlayerCombatLogEvent;
+import co.killionrevival.killioncombatlog.npc.traits.CombatLogTrait;
 import co.killionrevival.killioncombatlog.util.MessageUtility;
 import lombok.RequiredArgsConstructor;
 import net.citizensnpcs.api.npc.NPC;
@@ -95,25 +96,35 @@ public class CombatDisconnectListener implements Listener {
         if (npcUUID != null) {
             NPC npc = plugin.getNPCManager().getNPC(npcUUID);
             if (npc != null && npc.getEntity() instanceof Player npcPlayer) {
+                // Copy NPC state to player
                 player.setHealth(npcPlayer.getHealth());
                 player.setFoodLevel(npcPlayer.getFoodLevel());
                 player.setExp(npcPlayer.getExp());
                 player.setLevel(npcPlayer.getLevel());
+
+                // Get the actual remaining combat time from the NPC
+                if (npc.hasTrait(CombatLogTrait.class)) {
+                    CombatLogTrait trait = npc.getTrait(CombatLogTrait.class);
+                    int remainingTime = trait.getSecondsLeft();
+                    if (remainingTime > 0) {
+                        plugin.getCombatManager().setTimeRemain(player, remainingTime);
+
+                        plugin.getServer().getPluginManager().callEvent(
+                            new PlayerCombatStateChangedEvent(player, true)
+                        );
+
+                        String message = plugin.getConfig().getString(
+                            "messages.still-in-combat",
+                            "&cYou are still in combat for %seconds% more seconds!"
+                        ).replace("%seconds%", String.valueOf(remainingTime));
+
+                        player.sendMessage(MessageUtility.chatComponent(message));
+                    }
+                }
             }
         }
 
+        // Remove the combat logger NPC
         plugin.getCombatLogManager().removePlayer(playerUUID);
-
-        if (plugin.getCombatManager().isInCombat(player)) {
-            plugin.getServer().getPluginManager().callEvent(
-                    new PlayerCombatStateChangedEvent(player, true)
-            );
-
-            String message = plugin.getConfig().getString(
-                    "messages.still-in-combat",
-                    "&cYou are still in combat!"
-            );
-            player.sendMessage(MessageUtility.chatComponent(message));
-        }
     }
 }
