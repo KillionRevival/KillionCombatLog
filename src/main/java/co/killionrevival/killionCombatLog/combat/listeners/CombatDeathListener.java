@@ -16,19 +16,15 @@ import java.util.UUID;
  */
 @RequiredArgsConstructor
 public class CombatDeathListener implements Listener {
-
     private final KillionCombatLog plugin;
 
-    /**
-     * Handles player death events, removing combat states.
-     */
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player victim = event.getEntity();
         Player killer = victim.getKiller();
 
         if (plugin.getCombatManager().isInCombat(victim)) {
-            plugin.getCombatManager().removePlayer(victim);
+            plugin.getCombatManager().handlePlayerDeath(victim, killer);
 
             if (plugin.getConfig().getBoolean("settings.custom-death-messages", true)) {
                 String message = plugin.getConfig().getString(
@@ -43,8 +39,6 @@ public class CombatDeathListener implements Listener {
         }
 
         if (killer != null && plugin.getCombatManager().isInCombat(killer)) {
-            plugin.getCombatManager().removePlayer(killer);
-
             String message = plugin.getConfig().getString(
                     "messages.combat-kill",
                     "&aYou are no longer in combat after defeating %victim%!"
@@ -54,19 +48,16 @@ public class CombatDeathListener implements Listener {
         }
     }
 
-    /**
-     * Handles login death messages for players killed while offline.
-     */
     @EventHandler(priority = EventPriority.HIGH)
     public void onLoginDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
         UUID playerUUID = player.getUniqueId();
 
-        if (!plugin.getCombatManager().isPlayerDead(playerUUID)) {
+        if (!plugin.getCombatLogManager().hasDeathRecord(playerUUID)) {
             return;
         }
 
-        String killerName = plugin.getCombatManager().getKillerName(playerUUID);
+        String killerName = plugin.getCombatLogManager().getKillerName(playerUUID);
 
         event.setDeathMessage(null);
         String message = plugin.getConfig().getString(
@@ -75,8 +66,6 @@ public class CombatDeathListener implements Listener {
         ).replace("%killer%", killerName != null ? killerName : "unknown");
 
         player.sendMessage(MessageUtility.chatComponent(message));
-
-        plugin.getCombatManager().setTimeRemain(player, 0);
-        plugin.getCombatManager().setPlayerAsDead(playerUUID, null, false);
+        plugin.getCombatLogManager().removeDeathRecord(playerUUID);
     }
 }

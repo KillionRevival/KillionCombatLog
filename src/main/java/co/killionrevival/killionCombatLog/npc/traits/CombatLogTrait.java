@@ -9,13 +9,12 @@ import net.citizensnpcs.api.event.NPCDeathEvent;
 import net.citizensnpcs.api.trait.Trait;
 import net.citizensnpcs.trait.HologramTrait;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.Objects;
 
 /**
  * Custom trait for NPCs representing combat loggers.
@@ -97,7 +96,11 @@ public class CombatLogTrait extends Trait implements Listener {
         getNPC().destroy();
 
         String killerName = npcPlayer.getKiller() != null ? npcPlayer.getKiller().getName() : "unknown";
-        plugin.getCombatManager().setPlayerAsDead(parentPlayer.getUniqueId(), killerName, true);
+        plugin.getCombatLogManager().recordPlayerDeath(
+                parentPlayer.getUniqueId(),
+                killerName,
+                npcPlayer.getLocation().toString()
+        );
     }
 
     /**
@@ -254,8 +257,11 @@ public class CombatLogTrait extends Trait implements Listener {
      * @return The final damage after reductions.
      */
     private double calculateFinalDamage(Player player, double damage) {
-        double armor = Objects.requireNonNull(player.getAttribute(Attribute.GENERIC_ARMOR)).getValue();
-        double toughness = Objects.requireNonNull(player.getAttribute(Attribute.GENERIC_ARMOR_TOUGHNESS)).getValue();
+        AttributeInstance armorAttr = player.getAttribute(Attribute.ARMOR);
+        AttributeInstance toughnessAttr = player.getAttribute(Attribute.ARMOR_TOUGHNESS);
+
+        double armor = armorAttr != null ? armorAttr.getValue() : 0.0;
+        double toughness = toughnessAttr != null ? toughnessAttr.getValue() : 0.0;
 
         return damage * (1 - (Math.min(20.0, Math.max(armor / 5.0, armor - damage / (2.0 + toughness / 4.0))) / 25.0));
     }

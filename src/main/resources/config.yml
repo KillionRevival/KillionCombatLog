@@ -1,0 +1,61 @@
+# KillionCombatLog Configuration
+
+# Debug settings
+settings:
+  debug-mode: false
+
+  # Combat tag durations (in seconds)
+  combat-tag-duration: 30      # Initial combat tag duration
+  reengagement-duration: 10    # Additional time added when re-engaging in combat
+  doppel-swap-duration: 15     # Time added when a Doppel is created
+  max-duration: 60            # Maximum possible combat duration
+  max-session-length: 300     # Maximum length of a combat session (5 minutes)
+
+  # General settings
+  minimum-online-players: 1    # Minimum players needed for combat logging
+  doppel-only-in-combat: true # Only create Doppels for players in combat
+  custom-quit-messages: true   # Use custom messages when players combat log
+  custom-death-messages: true  # Use custom messages for combat deaths
+
+  # Rejoin penalties
+  rejoin-penalties:
+    enabled: true             # Enable penalties for rejoining during combat
+    health-percent: 20.0      # Percentage of health lost on rejoin (0-100)
+
+  # NPC (Doppel) settings
+  npc:
+    glow: true               # Make NPCs glow for visibility
+    despawn-delay: 300       # Time before NPC despawns if not killed (seconds)
+    invulnerable: false      # Whether NPCs are invulnerable
+
+# Messages
+messages:
+  # Combat status messages
+  in-combat: "&cYou are in combat for %seconds% more seconds!"
+  no-longer: "&aYou are no longer in combat."
+  combat-engaged: "&cYou have entered combat!"
+  combat-engaged-projectile: "&cYou have entered combat due to projectile!"
+  still-in-combat: "&cYou are still in combat for %seconds% more seconds!"
+  entered-safezone: "&aYou have entered a safe zone. Combat ended."
+
+  # Death messages
+  combat-death: "&c%victim% was slain by %killer% in combat!"
+  combat-kill: "&aYou are no longer in combat after defeating %victim%!"
+  combat-log-death: "&cYou were killed by &6%killer%&c while logged out."
+  offline-death: "&cYou died while offline in combat."
+  mutual-death: "&cBoth combatants have fallen!"
+
+  # Combat logging messages
+  combat-quit: "&c%player% has combat logged!"
+  combat-rejoin: "&c%player% has rejoined during combat!"
+  doppel-killed: "&c%player%'s combat logging NPC was killed by %killer%!"
+  doppel-despawned: "&a%player%'s combat logging NPC has despawned."
+
+  # Error messages
+  no-permission: "&cYou don't have permission to do that!"
+  safe-zone: "&cYou can't do that in a safe zone!"
+  invalid-player: "&cInvalid player!"
+
+  # Command messages
+  reload-success: "&aConfiguration reloaded successfully!"
+  status-check: "&7Combat status for %player%: %status%"

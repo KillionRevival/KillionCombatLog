@@ -1,45 +1,36 @@
 package co.killionrevival.killioncombatlog;
 
-import co.killionrevival.killioncombatlog.combat.CombatManager;
-import co.killionrevival.killioncombatlog.combat.listeners.CombatDeathListener;
-import co.killionrevival.killioncombatlog.combat.listeners.CombatDisconnectListener;
-import co.killionrevival.killioncombatlog.combat.listeners.CombatStateListener;
-import co.killionrevival.killioncombatlog.core.commands.KCLCommand;
+import co.killionrevival.killioncombatlog.combat.*;
+import co.killionrevival.killioncombatlog.combat.listeners.*;
+import co.killionrevival.killioncombatlog.commands.KCLCommand;
 import co.killionrevival.killioncombatlog.logger.CombatLogManager;
+import co.killionrevival.killioncombatlog.logger.listeners.CombatLogListener;
 import co.killionrevival.killioncombatlog.npc.NPCManager;
 import co.killionrevival.killioncombatlog.npc.TraitManager;
 import co.killionrevival.killioncombatlog.util.LogUtil;
-import co.killionrevival.killioncombatlog.util.MessageUtility;
 import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.Objects;
-
-/**
- * The main class of the KillionCombatLog plugin.
- * <p>
- * This plugin addresses the issue of combat logging by spawning an NPC when a player disconnects during combat.
- * The NPC represents the player and can be attacked by others, ensuring that combat consequences are enforced.
- * </p>
- */
+@Getter
 public final class KillionCombatLog extends JavaPlugin {
+    private CombatSessionManager combatSessionManager;
+    private CombatEntityManager entityManager;
+    private CombatManager combatManager;
+    private CombatLogManager combatLogManager;
+    private NPCManager npcManager;  // Make sure this has @Getter
+    private TraitManager traitManager;
 
-    @Getter private CombatManager combatManager;
-    @Getter private CombatLogManager combatLogManager;
-    @Getter private TraitManager traitManager;
-    private NPCManager npcManager;
-
-    public NPCManager getNPCManager() {
-        return this.npcManager;
+    public NPCManager getNPCManager() {  // Explicit getter for NPCManager
+        return npcManager;
     }
 
     @Override
     public void onLoad() {
         try {
             getLogger().info("KillionCombatLog is loading...");
-            // Add any onLoad initialization if needed
         } catch (Exception e) {
             getLogger().severe("Error during plugin load: " + e.getMessage());
             e.printStackTrace();
@@ -65,80 +56,113 @@ public final class KillionCombatLog extends JavaPlugin {
         return allDependenciesPresent;
     }
 
-    /**
-     * Initializes the plugin's configuration and managers.
-     * Loads default settings and prepares the plugin for operation.
-     */
-    private void initialize() {
-        LogUtil.info("Initializing plugin configuration...");
-        this.saveDefaultConfig();
-        this.getConfig().options().copyDefaults(true);
-
-        LogUtil.debug("Loading default configuration values...");
-        this.getConfig().addDefault("messages.in-combat", "&cYou are now in combat &4&l>> &a%seconds% seconds.");
-        this.getConfig().addDefault("messages.no-longer", "&cYou are no longer in combat.");
-        this.getConfig().addDefault("settings.npc-lifetime-seconds", 30);
-        this.getConfig().addDefault("settings.combat-tag-duration", 30);
-        this.saveConfig();
-        LogUtil.info("Configuration initialized successfully");
-
-        LogUtil.info("Initializing managers...");
-        this.combatManager = new CombatManager(this);
-        this.combatLogManager = new CombatLogManager(this);
-        this.traitManager = new TraitManager();
-        this.npcManager = new NPCManager(this);
-        LogUtil.info("All managers initialized successfully");
-    }
-
-    /**
-     * Registers event listeners and commands.
-     * Ensures that the plugin responds to game events and player commands appropriately.
-     */
-    private void registerComponents() {
-        LogUtil.info("Registering event listeners...");
-        this.getServer().getPluginManager().registerEvents(new CombatStateListener(this), this);
-        this.getServer().getPluginManager().registerEvents(new CombatDeathListener(this), this);
-        this.getServer().getPluginManager().registerEvents(new CombatDisconnectListener(this), this);
-        this.getServer().getPluginManager().registerEvents(
-            new co.killionrevival.killioncombatlog.logger.listeners.CombatLogListener(this), this
-        );
-        LogUtil.info("Event listeners registered successfully");
-
-        LogUtil.info("Registering commands...");
-        KCLCommand kclCommand = new KCLCommand(this);
-        Objects.requireNonNull(this.getCommand("killioncombatlog")).setExecutor(kclCommand);
-        Objects.requireNonNull(this.getCommand("killioncombatlog")).setTabCompleter(kclCommand);
-        LogUtil.info("Commands registered successfully");
-    }
-
-    /**
-     * Performs startup routines such as logging plugin activation.
-     */
-    private void startPlugin() {
-        LogUtil.info("Plugin loaded successfully.");
-    }
-
-    /**
-     * Performs shutdown routines such as closing database connections.
-     */
-    private void stopPlugin() {
-        LogUtil.info("Shutting down plugin...");
-        if (this.combatManager != null) {
-            this.combatManager.close();
-        }
-        LogUtil.info("Plugin stopped successfully");
-    }
-
     @Override
     public void onEnable() {
         LogUtil.init(this);
-        initialize();
-        registerComponents();
-        startPlugin();
+
+        if (!checkDependencies()) {
+            getLogger().severe("Missing required dependencies - disabling plugin!");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        // Load configuration
+        this.saveDefaultConfig();
+        this.getConfig().options().copyDefaults(true);
+        this.saveConfig();
+
+        setupDefaultConfig();
+
+        // Load combat settings
+        int initialDuration = getConfig().getInt("settings.combat-tag-duration", 30);
+        int reengagementDuration = getConfig().getInt("settings.reengagement-duration", 10);
+        int doppelSwapDuration = getConfig().getInt("settings.doppel-swap-duration", 15);
+        int maxDuration = getConfig().getInt("settings.max-duration", 60);
+        long maxSessionLength = getConfig().getLong("settings.max-session-length", 300);
+
+        // Initialize managers in correct order
+        this.entityManager = new CombatEntityManager();
+
+        this.combatSessionManager = new CombatSessionManager(
+                this,
+                initialDuration,
+                reengagementDuration,
+                doppelSwapDuration,
+                maxDuration,
+                maxSessionLength
+        );
+
+        this.npcManager = new NPCManager(this);
+        this.traitManager = new TraitManager();
+        this.combatManager = new CombatManager(this);
+        this.combatLogManager = new CombatLogManager(this);
+
+        // Register listeners
+        registerListeners();
+
+        // Register commands
+        registerCommands();
+
+        LogUtil.info("Plugin enabled successfully.");
+    }
+
+    private void registerListeners() {
+        PluginManager pm = getServer().getPluginManager();
+        pm.registerEvents(new CombatLogListener(this), this);
+        pm.registerEvents(new CombatDisconnectListener(this), this);
+        pm.registerEvents(new CombatDeathListener(this), this);
+        pm.registerEvents(new CombatAttackListener(this), this);
+    }
+
+    private void registerCommands() {
+        KCLCommand kclCommand = new KCLCommand(this);
+        getCommand("killioncombatlog").setExecutor(kclCommand);
+        getCommand("killioncombatlog").setTabCompleter(kclCommand);
     }
 
     @Override
     public void onDisable() {
-        stopPlugin();
+        // Cleanup in reverse order of initialization
+        if (combatManager != null) {
+            combatManager.shutdown();
+        }
+        if (combatSessionManager != null) {
+            combatSessionManager.shutdown();
+        }
+        if (entityManager != null) {
+            entityManager.shutdown();
+        }
+        if (combatLogManager != null) {
+            // Any cleanup needed for CombatLogManager
+        }
+        if (npcManager != null) {
+            // Any cleanup needed for NPCManager
+        }
+
+        LogUtil.info("Plugin disabled successfully.");
+    }
+
+    /**
+     * Adds default values to config if they don't exist
+     */
+    private void setupDefaultConfig() {
+        getConfig().addDefault("settings.combat-tag-duration", 30);
+        getConfig().addDefault("settings.reengagement-duration", 10);
+        getConfig().addDefault("settings.doppel-swap-duration", 15);
+        getConfig().addDefault("settings.max-duration", 60);
+        getConfig().addDefault("settings.max-session-length", 300);
+        getConfig().addDefault("settings.debug-mode", false);
+
+        getConfig().addDefault("messages.in-combat", "&cYou are in combat for %seconds% more seconds!");
+        getConfig().addDefault("messages.no-longer", "&aYou are no longer in combat.");
+        getConfig().addDefault("messages.combat-engaged", "&cYou have entered combat!");
+        getConfig().addDefault("messages.combat-engaged-projectile", "&cYou have entered combat due to projectile!");
+        getConfig().addDefault("messages.combat-death", "&c%victim% was slain by %killer% in combat!");
+        getConfig().addDefault("messages.combat-kill", "&aYou are no longer in combat after defeating %victim%!");
+        getConfig().addDefault("messages.combat-log-death", "&cYou were killed by &6%killer%&c while logged out.");
+        getConfig().addDefault("messages.still-in-combat", "&cYou are still in combat!");
+
+        getConfig().options().copyDefaults(true);
+        saveConfig();
     }
 }

@@ -1,4 +1,4 @@
-package co.killionrevival.killioncombatlog.core.commands;
+package co.killionrevival.killioncombatlog.commands;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.util.MessageUtility;

@@ -9,39 +9,28 @@ import java.util.UUID;
 
 /**
  * Manages players who have combat logged and their associated NPCs.
- * Keeps track of combat loggers to handle their NPCs appropriately.
  */
 public class CombatLogManager {
-
     private final Map<UUID, UUID> combatLoggers = new HashMap<>();
+    private final Map<UUID, String> deathRecords = new HashMap<>();
     private final KillionCombatLog plugin;
 
-    /**
-     * Constructor to initialize the manager with the main plugin instance.
-     *
-     * @param plugin The main plugin instance.
-     */
     public CombatLogManager(KillionCombatLog plugin) {
         this.plugin = plugin;
         LogUtil.info("Combat Log Manager initialized");
     }
 
     /**
-     * Adds a player to the combat loggers list with their associated NPC UUID.
-     *
-     * @param playerUniqueId The UUID of the player.
-     * @param npcUniqueId    The UUID of the NPC representing the player.
+     * Adds a player to the combat loggers list with their associated NPC UUID
      */
     public void addPlayer(UUID playerUniqueId, UUID npcUniqueId) {
         this.combatLoggers.put(playerUniqueId, npcUniqueId);
         LogUtil.combat(String.format("Added combat logger: Player UUID=%s, NPC UUID=%s",
-            playerUniqueId, npcUniqueId));
+                playerUniqueId, npcUniqueId));
     }
 
     /**
-     * Removes a player from the combat loggers list and removes their NPC.
-     *
-     * @param playerUniqueId The UUID of the player.
+     * Removes a player from the combat loggers list and removes their NPC
      */
     public void removePlayer(UUID playerUniqueId) {
         if (!this.isCombatLogger(playerUniqueId)) {
@@ -54,27 +43,52 @@ public class CombatLogManager {
         plugin.getNPCManager().removeNPC(npcUUID);
         this.combatLoggers.remove(playerUniqueId);
         LogUtil.debug(String.format("Successfully removed combat logger and associated NPC: Player=%s, NPC=%s",
-            playerUniqueId, npcUUID));
+                playerUniqueId, npcUUID));
     }
 
     /**
-     * Checks if a player is currently a combat logger.
-     *
-     * @param playerUniqueId The UUID of the player.
-     * @return True if the player is a combat logger; false otherwise.
+     * Records a player's death while logged out
+     */
+    public void recordPlayerDeath(UUID playerUUID, String killerName, String location) {
+        deathRecords.put(playerUUID, killerName);
+        LogUtil.debug(String.format("Recorded death for player %s, killed by %s at %s",
+                playerUUID, killerName, location));
+    }
+
+    /**
+     * Removes a player's death record
+     */
+    public void removeDeathRecord(UUID playerUUID) {
+        deathRecords.remove(playerUUID);
+        LogUtil.debug(String.format("Removed death record for player %s", playerUUID));
+    }
+
+    /**
+     * Checks if a player has a death record
+     */
+    public boolean hasDeathRecord(UUID playerUUID) {
+        return deathRecords.containsKey(playerUUID);
+    }
+
+    /**
+     * Gets the killer's name from a player's death record
+     */
+    public String getKillerName(UUID playerUUID) {
+        return deathRecords.get(playerUUID);
+    }
+
+    /**
+     * Checks if a player is currently a combat logger
      */
     public boolean isCombatLogger(UUID playerUniqueId) {
         boolean isLogger = this.combatLoggers.containsKey(playerUniqueId) &&
-                          this.combatLoggers.get(playerUniqueId) != null;
+                this.combatLoggers.get(playerUniqueId) != null;
         LogUtil.debug(String.format("Checked combat logger status for %s: %s", playerUniqueId, isLogger));
         return isLogger;
     }
 
     /**
-     * Retrieves the NPC UUID associated with a combat logging player.
-     *
-     * @param playerUniqueId The UUID of the player.
-     * @return The UUID of the NPC.
+     * Gets the NPC UUID associated with a combat logging player
      */
     public UUID getPlayerNPC(UUID playerUniqueId) {
         UUID npcUUID = this.combatLoggers.get(playerUniqueId);
