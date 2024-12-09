@@ -86,13 +86,20 @@ public class CombatLogTrait extends Trait implements Listener {
             remainingTime = plugin.getConfigManager().getDoppelDefaultDuration();
         }
 
-        double hearts = Math.ceil(npcPlayer.getHealth() / 2.0);
+        // Calculate hearts (health / 2 since each heart is 2 health points)
+        int hearts = (int) Math.ceil(npcPlayer.getHealth() / 2.0);
+        StringBuilder heartDisplay = new StringBuilder();
+        for (int i = 0; i < hearts; i++) {
+            heartDisplay.append("❤");
+        }
 
         hologramTrait.clear();
-        hologramTrait.addLine(MessageUtility.colorize(String.format("&c❤ %d Hearts", (int)hearts)));
+        hologramTrait.addLine(MessageUtility.colorize("&c" + heartDisplay.toString()));
         hologramTrait.addLine(MessageUtility.colorize(String.format("&e%ds Remaining", remainingTime)));
         hologramTrait.addLine(MessageUtility.colorize("&c&lPLAYER DISCONNECTED"));
     }
+
+
 
     @EventHandler
     public void onNPCDamage(NPCDamageByEntityEvent event) {
