@@ -7,13 +7,6 @@ import org.bukkit.entity.Player;
 
 import java.util.UUID;
 
-/**
- * High-level combat operations:
- * - Handling death events
- * - Ending sessions
- * - Checking combat state
- * - Managing combat displays
- */
 public class CombatManager {
     private final KillionCombatLog plugin;
 
@@ -27,23 +20,22 @@ public class CombatManager {
             return;
         }
 
-        // Get the highest remaining time from all active sessions
         int highestRemainingTime = entity.getActiveSessionsSnapshot().stream()
                 .mapToInt(CombatSession::getRemainingSeconds)
                 .max()
                 .orElse(0);
 
-        // Get and format the message
         String message = plugin.getConfigManager().getInCombatMessage()
                 .replace("%seconds%", String.valueOf(highestRemainingTime));
 
-        // Send to action bar
         player.sendActionBar(MessageUtility.chatComponent(message));
     }
 
     public void handlePlayerDeath(Player deadPlayer, Player killer) {
         CombatEntity deadEntity = plugin.getEntityManager().getEntity(deadPlayer);
         if (deadEntity == null) return;
+
+        LogUtil.debug(String.format("Processing death for player %s", deadPlayer.getName()));
 
         for (CombatSession session : deadEntity.getActiveSessionsSnapshot()) {
             CombatEndReason reason = session.handleDeath(deadEntity.getPlayerId());
@@ -68,16 +60,15 @@ public class CombatManager {
     }
 
     public void endCombatSession(CombatSession session, CombatEndReason reason) {
+        LogUtil.debug(String.format("Ending combat session with reason: %s", reason));
         plugin.getCombatSessionManager().removeSession(session);
 
         CombatEntity entity1 = plugin.getEntityManager().getEntity(session.getCombatantId());
         CombatEntity entity2 = plugin.getEntityManager().getEntity(session.getVictimId());
 
-        // Remove sessions from entities
         if (entity1 != null) {
             entity1.removeSession(session);
             if (!entity1.isInCombat()) {
-                // If no longer in combat, remove Doppel if exists
                 if (entity1.hasDoppel()) {
                     LogUtil.debug("Removing Doppel for entity1 as combat ended");
                     entity1.removeDoppel();
@@ -95,7 +86,6 @@ public class CombatManager {
         if (entity2 != null) {
             entity2.removeSession(session);
             if (!entity2.isInCombat()) {
-                // If no longer in combat, remove Doppel if exists
                 if (entity2.hasDoppel()) {
                     LogUtil.debug("Removing Doppel for entity2 as combat ended");
                     entity2.removeDoppel();
@@ -126,5 +116,6 @@ public class CombatManager {
 
     public void shutdown() {
         // No direct resources to clean here
+        LogUtil.debug("Combat Manager shutting down");
     }
 }

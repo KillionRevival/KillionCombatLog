@@ -54,7 +54,7 @@ public class CombatLogTrait extends Trait implements Listener {
                 updateHologram();
             }
         };
-        updateTask.runTaskTimer(plugin, 0L, 20L); // Update every second
+        updateTask.runTaskTimer(plugin, 0L, 20L);
     }
 
     private void setupHologram() {
@@ -71,7 +71,6 @@ public class CombatLogTrait extends Trait implements Listener {
     private void updateHologram() {
         if (hologramTrait == null || !npc.isSpawned() || !(npc.getEntity() instanceof Player npcPlayer)) return;
 
-        // Get remaining time
         UUID ownerId = getNPC().data().get("owner-uuid");
         if (ownerId == null) return;
 
@@ -79,39 +78,43 @@ public class CombatLogTrait extends Trait implements Listener {
         int remainingTime = 0;
 
         if (ownerEntity != null && ownerEntity.isInCombat()) {
-            // Get highest remaining time from all sessions
             remainingTime = ownerEntity.getActiveSessionsSnapshot().stream()
                     .mapToInt(CombatSession::getRemainingSeconds)
                     .max()
                     .orElse(0);
         } else {
-            // If not in combat, use default duration
             remainingTime = plugin.getConfigManager().getDoppelDefaultDuration();
         }
 
-        // Calculate hearts (health / 2 since each heart is 2 health points)
         double hearts = Math.ceil(npcPlayer.getHealth() / 2.0);
 
         hologramTrait.clear();
-        hologramTrait.addLine(MessageUtility.colorize(String.format("&c&lDOPPEL - %s", npc.getName())));
         hologramTrait.addLine(MessageUtility.colorize(String.format("&c❤ %d Hearts", (int)hearts)));
         hologramTrait.addLine(MessageUtility.colorize(String.format("&e%ds Remaining", remainingTime)));
+        hologramTrait.addLine(MessageUtility.colorize("&c&lPLAYER DISCONNECTED"));
     }
 
     @EventHandler
     public void onNPCDamage(NPCDamageByEntityEvent event) {
         if (event.getNPC() != this.getNPC()) return;
-        if (!(event.getDamager() instanceof Player attacker)) return;
+        event.setCancelled(false);
 
-        LogUtil.debug("Doppel damaged by " + attacker.getName());
-        event.setCancelled(false); // allow damage
+        if (event.getNPC().getEntity() instanceof Player npcPlayer) {
+            // Calculate and store health after damage
+            double newHealth = Math.max(0, npcPlayer.getHealth() - event.getDamage());
+            LogUtil.debug(String.format("Doppel health updated: %f -> %f", npcPlayer.getHealth(), newHealth));
+            getNPC().data().set("final-health", newHealth);
+        }
 
-        UUID ownerId = event.getNPC().data().get("owner-uuid");
-        if (ownerId != null) {
-            var ownerEntity = plugin.getEntityManager().getEntity(ownerId);
-            if (ownerEntity != null) {
-                LogUtil.debug("Notifying owner's CombatEntity of Doppel damage");
-                ownerEntity.handleDoppelDamage(attacker);
+        if (event.getDamager() instanceof Player attacker) {
+            LogUtil.debug("Doppel damaged by " + attacker.getName());
+            UUID ownerId = event.getNPC().data().get("owner-uuid");
+            if (ownerId != null) {
+                var ownerEntity = plugin.getEntityManager().getEntity(ownerId);
+                if (ownerEntity != null) {
+                    LogUtil.debug("Notifying owner's CombatEntity of Doppel damage");
+                    ownerEntity.handleDoppelDamage(attacker);
+                }
             }
         }
     }
@@ -123,6 +126,8 @@ public class CombatLogTrait extends Trait implements Listener {
         LogUtil.debug("Doppel death event triggered");
 
         if (event.getNPC().getEntity() instanceof Player npcPlayer) {
+            getNPC().data().set("final-health", 0.0);
+
             // Drop inventory contents
             for (ItemStack item : npcPlayer.getInventory().getContents()) {
                 if (item != null && !item.getType().isAir()) {
@@ -136,9 +141,6 @@ public class CombatLogTrait extends Trait implements Listener {
                     npcPlayer.getWorld().dropItemNaturally(npcPlayer.getLocation(), item.clone());
                 }
             }
-
-            // Store final health in NPC data for rejoin sync
-            getNPC().data().set("final-health", npcPlayer.getHealth());
         }
 
         UUID ownerId = event.getNPC().data().get("owner-uuid");

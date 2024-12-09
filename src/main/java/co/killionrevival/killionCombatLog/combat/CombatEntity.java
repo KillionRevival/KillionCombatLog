@@ -97,12 +97,22 @@ public class CombatEntity {
         }
 
         if (player != null) {
+            double currentHealth = player.getHealth();
             LogUtil.debug(String.format("Creating Doppel for player %s with health %f",
-                player.getName(), player.getHealth()));
-            this.doppel = new Doppel(player.getUniqueId(), player.getHealth(), player.getInventory().getContents());
+                player.getName(), currentHealth));
+
+            // Store the current health in the database
+            plugin.getDatabaseManager().saveDoppelState(
+                player.getUniqueId(),
+                currentHealth,
+                player.getInventory().getContents(),
+                player.getInventory().getArmorContents(),
+                player.getLocation().toString()
+            );
+
+            this.doppel = new Doppel(player.getUniqueId(), currentHealth, player.getInventory().getContents());
             plugin.getNPCManager().createNPC(doppel, player);
 
-            // If not in combat, start a despawn timer
             if (!isInCombat()) {
                 int defaultDuration = plugin.getConfigManager().getDoppelDefaultDuration();
                 new BukkitRunnable() {
@@ -120,33 +130,57 @@ public class CombatEntity {
 
     public void handleLoginWithDoppel(Player player) {
         this.player = player;
-        if (doppel != null && doppel.getNpc() != null) {
-            LogUtil.debug("Transferring Doppel state back to player " + player.getName());
+        try {
+            if (doppel != null && doppel.getNpc() != null) {
+                LogUtil.debug("Transferring Doppel state back to player " + player.getName());
 
-            // Get final health from NPC if it exists
-            Double finalHealth = doppel.getNpc().data().get("final-health");
-            if (finalHealth != null) {
-                LogUtil.debug("Setting player health to Doppel's final health: " + finalHealth);
-                player.setHealth(Math.max(0.1, Math.min(Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getValue(), finalHealth)));
-            } else {
-                // Fall back to original Doppel health
-                player.setHealth(Math.max(0.1, Math.min(Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getValue(), doppel.getHealth())));
+                // Get max health
+                double maxHealth = Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getValue();
+
+                // Try to get health from different sources in order of preference
+                double finalHealth;
+
+                // 1. Try NPC's current health first
+                if (doppel.getNpc().getEntity() instanceof Player npcPlayer) {
+                    finalHealth = npcPlayer.getHealth();
+                    LogUtil.debug("Using NPC's current health: " + finalHealth);
+                }
+                // 2. Try stored final health
+                else if (doppel.getNpc().data().has("final-health")) {
+                    finalHealth = doppel.getNpc().data().get("final-health");
+                    LogUtil.debug("Using stored final health: " + finalHealth);
+                }
+                // 3. Fall back to original Doppel health
+                else {
+                    finalHealth = doppel.getHealth();
+                    LogUtil.debug("Using original Doppel health: " + finalHealth);
+                }
+
+                // Validate and set health
+                finalHealth = Math.max(0.1, Math.min(maxHealth, finalHealth));
+                LogUtil.debug(String.format("Setting player health to %f (Max: %f)", finalHealth, maxHealth));
+                player.setHealth(finalHealth);
+
+                removeDoppel();
+
+                if (isInCombat()) {
+                    plugin.getServer().getPluginManager().callEvent(
+                            new PlayerCombatStateChangedEvent(player, true)
+                    );
+
+                    int highestRemainingTime = activeSessions.stream()
+                            .mapToInt(CombatSession::getRemainingSeconds)
+                            .max().orElse(0);
+                    String message = plugin.getConfigManager().getStillInCombatMessage()
+                            .replace("%seconds%", String.valueOf(highestRemainingTime));
+                    player.sendMessage(co.killionrevival.killioncombatlog.util.MessageUtility.chatComponent(message));
+                }
             }
-
-            removeDoppel();
-
-            if (isInCombat()) {
-                plugin.getServer().getPluginManager().callEvent(
-                        new PlayerCombatStateChangedEvent(player, true)
-                );
-
-                int highestRemainingTime = activeSessions.stream()
-                        .mapToInt(CombatSession::getRemainingSeconds)
-                        .max().orElse(0);
-                String message = plugin.getConfigManager().getStillInCombatMessage()
-                        .replace("%seconds%", String.valueOf(highestRemainingTime));
-                player.sendMessage(co.killionrevival.killioncombatlog.util.MessageUtility.chatComponent(message));
-            }
+        } catch (Exception e) {
+            LogUtil.error("Error while handling login with Doppel", e);
+            // Set minimum health if something goes wrong
+            player.setHealth(Math.max(0.1, Math.min(Objects.requireNonNull(
+                player.getAttribute(Attribute.MAX_HEALTH)).getValue(), 1.0)));
         }
     }
 
