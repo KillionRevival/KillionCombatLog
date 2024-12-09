@@ -1,42 +1,51 @@
 package co.killionrevival.killioncombatlog.combat;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
-import co.killionrevival.killioncombatlog.combat.events.PlayerCombatStateChangedEvent;
-import lombok.RequiredArgsConstructor;
+import co.killionrevival.killioncombatlog.util.MessageUtility;
 import org.bukkit.entity.Player;
 
 import java.util.UUID;
 
-@RequiredArgsConstructor
+/**
+ * High-level combat operations:
+ * - Handling death events
+ * - Ending sessions
+ * - Checking combat state
+ * - Managing combat displays
+ */
 public class CombatManager {
     private final KillionCombatLog plugin;
 
-    public void initiateCombat(Player attacker, Player victim) {
-        CombatEntity attackerEntity = plugin.getEntityManager().getEntity(attacker);
-        CombatEntity victimEntity = plugin.getEntityManager().getEntity(victim);
+    public CombatManager(KillionCombatLog plugin) {
+        this.plugin = plugin;
+    }
 
-        CombatSession session = plugin.getCombatSessionManager().createSession(
-                attackerEntity,
-                victimEntity
-        );
+    public void updateCombatDisplay(Player player) {
+        CombatEntity entity = plugin.getEntityManager().getEntity(player);
+        if (entity == null || !entity.isInCombat()) {
+            return;
+        }
 
-        if (!attackerEntity.isInCombat()) {
-            plugin.getServer().getPluginManager().callEvent(
-                    new PlayerCombatStateChangedEvent(attacker, true)
-            );
-        }
-        if (!victimEntity.isInCombat()) {
-            plugin.getServer().getPluginManager().callEvent(
-                    new PlayerCombatStateChangedEvent(victim, true)
-            );
-        }
+        // Get the highest remaining time from all active sessions
+        int highestRemainingTime = entity.getActiveSessionsSnapshot().stream()
+                .mapToInt(CombatSession::getRemainingSeconds)
+                .max()
+                .orElse(0);
+
+        // Get and format the message
+        String message = plugin.getConfigManager().getInCombatMessage()
+                .replace("%seconds%", String.valueOf(highestRemainingTime));
+
+        // Send to action bar
+        player.sendActionBar(MessageUtility.chatComponent(message));
     }
 
     public void handlePlayerDeath(Player deadPlayer, Player killer) {
         CombatEntity deadEntity = plugin.getEntityManager().getEntity(deadPlayer);
+        if (deadEntity == null) return;
 
-        for (CombatSession session : deadEntity.getActiveSessions()) {
-            CombatEndReason reason = session.handleDeath(deadEntity.getEntityId());
+        for (CombatSession session : deadEntity.getActiveSessionsSnapshot()) {
+            CombatEndReason reason = session.handleDeath(deadEntity.getPlayerId());
             if (reason.isVictoryCondition()) {
                 endCombatSession(session, reason);
             }
@@ -51,43 +60,43 @@ public class CombatManager {
         }
     }
 
-    private void endCombatSession(CombatSession session, CombatEndReason reason) {
+    public void handleSafeZoneEntry(Player player) {
+        CombatEntity entity = plugin.getEntityManager().getEntity(player);
+        if (entity == null) return;
+        entity.handleSafeZoneEntry();
+    }
+
+    public void endCombatSession(CombatSession session, CombatEndReason reason) {
+        plugin.getCombatSessionManager().removeSession(session);
+
         CombatEntity entity1 = plugin.getEntityManager().getEntity(session.getCombatantId());
         CombatEntity entity2 = plugin.getEntityManager().getEntity(session.getVictimId());
 
+        // Remove sessions from entities
         if (entity1 != null) {
-            entity1.removeCombatSession(session);
+            entity1.removeSession(session);
             if (!entity1.isInCombat()) {
-                Player player = plugin.getServer().getPlayer(entity1.getEntityId());
-                if (player != null) {
+                Player p = plugin.getServer().getPlayer(entity1.getPlayerId());
+                if (p != null) {
+                    p.sendActionBar(MessageUtility.chatComponent("")); // Clear action bar
                     plugin.getServer().getPluginManager().callEvent(
-                            new PlayerCombatStateChangedEvent(player, false)
+                            new PlayerCombatStateChangedEvent(p, false)
                     );
                 }
             }
         }
 
         if (entity2 != null) {
-            entity2.removeCombatSession(session);
+            entity2.removeSession(session);
             if (!entity2.isInCombat()) {
-                Player player = plugin.getServer().getPlayer(entity2.getEntityId());
-                if (player != null) {
+                Player p = plugin.getServer().getPlayer(entity2.getPlayerId());
+                if (p != null) {
+                    p.sendActionBar(MessageUtility.chatComponent("")); // Clear action bar
                     plugin.getServer().getPluginManager().callEvent(
-                            new PlayerCombatStateChangedEvent(player, false)
+                            new PlayerCombatStateChangedEvent(p, false)
                     );
                 }
             }
-        }
-    }
-
-    public void handleSafeZoneEntry(Player player) {
-        CombatEntity entity = plugin.getEntityManager().getEntity(player);
-        entity.handleSafeZoneEntry();
-
-        if (entity.isInCombat()) {
-            plugin.getServer().getPluginManager().callEvent(
-                    new PlayerCombatStateChangedEvent(player, false)
-            );
         }
     }
 
@@ -105,6 +114,6 @@ public class CombatManager {
     }
 
     public void shutdown() {
-        // Nothing to clean up directly
+        // No direct resources to clean here
     }
 }

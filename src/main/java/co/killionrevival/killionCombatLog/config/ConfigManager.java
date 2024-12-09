@@ -1,148 +1,122 @@
 package co.killionrevival.killioncombatlog.config;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
-import co.killionrevival.killioncombatlog.util.LogUtil;
-import co.killionrevival.killioncombatlog.util.MessageUtility;
 import lombok.Getter;
 import org.bukkit.configuration.file.FileConfiguration;
-
-import java.util.HashMap;
-import java.util.Map;
 
 public class ConfigManager {
     private final KillionCombatLog plugin;
     private FileConfiguration config;
 
-    @Getter private final Map<String, String> messages = new HashMap<>();
-    @Getter private boolean debugMode;
-    @Getter private int combatTagDuration;
-    @Getter private int reengagementDuration;
-    @Getter private int doppelSwapDuration;
-    @Getter private int maxDuration;
-    @Getter private long maxSessionLength;
-    @Getter private int minimumOnlinePlayers;
-    @Getter private boolean doppelOnlyInCombat;
-    @Getter private boolean customQuitMessages;
-    @Getter private boolean customDeathMessages;
+    // Configuration fields
+    @Getter
+    private int combatTagDuration;
+    @Getter
+    private int reengagementDuration;
+    @Getter
+    private int doppelSwapDuration;
+    @Getter
+    private int maxDuration;
+    @Getter
+    private long maxSessionLength;
+    @Getter
+    private boolean debugMode;
+    @Getter
+    private boolean customDeathMessages;
 
-    // Combat Settings
-    @Getter private boolean rejoinPenaltiesEnabled;
-    @Getter private double rejoinHealthPenalty;
-
-    // NPC Settings
-    @Getter private boolean npcGlow;
-    @Getter private int npcDespawnDelay;
-    @Getter private boolean npcInvulnerable;
+    // Messages
+    @Getter
+    private String inCombatMessage;
+    @Getter
+    private String noLongerMessage;
+    @Getter
+    private String combatEngagedMessage;
+    @Getter
+    private String combatEngagedProjectileMessage;
+    @Getter
+    private String combatDeathMessage;
+    @Getter
+    private String combatKillMessage;
+    @Getter
+    private String combatLogDeathMessage;
+    @Getter
+    private String stillInCombatMessage;
+    @Getter
+    private String offlineDeathMessage;
 
     public ConfigManager(KillionCombatLog plugin) {
         this.plugin = plugin;
-        reload();
     }
 
-    public void reload() {
+    /**
+     * Loads the configuration from the config.yml file, sets defaults, and caches values.
+     */
+    public void loadConfig() {
         plugin.saveDefaultConfig();
-        plugin.reloadConfig();
-        config = plugin.getConfig();
-        loadSettings();
-        loadMessages();
-        validate();
+        plugin.reloadConfig(); // Ensure latest values are loaded
+        this.config = plugin.getConfig();
+        setDefaults();
+        cacheValues();
     }
 
-    private void loadSettings() {
-        // Debug Settings
-        debugMode = config.getBoolean("settings.debug-mode", false);
-        LogUtil.setDebug(debugMode);
+    /**
+     * Reloads the configuration and updates cached values.
+     */
+    public void reloadConfig() {
+        plugin.reloadConfig();
+        this.config = plugin.getConfig();
+        cacheValues();
+    }
 
-        // Combat Timers
+    /**
+     * Sets default values for config keys if they are not present.
+     */
+    private void setDefaults() {
+        config.addDefault("settings.combat-tag-duration", 30);
+        config.addDefault("settings.reengagement-duration", 10);
+        config.addDefault("settings.doppel-swap-duration", 15);
+        config.addDefault("settings.max-duration", 60);
+        config.addDefault("settings.max-session-length", 300);
+        config.addDefault("settings.debug-mode", false);
+        config.addDefault("settings.custom-death-messages", true);
+
+        config.addDefault("messages.in-combat", "&cYou are in combat for %seconds% more seconds!");
+        config.addDefault("messages.no-longer", "&aYou are no longer in combat.");
+        config.addDefault("messages.combat-engaged", "&cYou have entered combat!");
+        config.addDefault("messages.combat-engaged-projectile", "&cYou have entered combat due to projectile!");
+        config.addDefault("messages.combat-death", "&c%victim% was slain by %killer% in combat!");
+        config.addDefault("messages.combat-kill", "&aYou are no longer in combat after defeating %victim%!");
+        config.addDefault("messages.combat-log-death", "&cYou were killed by &6%killer%&c while logged out.");
+        config.addDefault("messages.still-in-combat", "&cYou are still in combat!");
+        config.addDefault("messages.offline-death", "&cYou were killed by &6%killer%&c while logged out.");
+
+        config.options().copyDefaults(true);
+        plugin.saveConfig();
+    }
+
+    /**
+     * Reads values from the config into memory.
+     */
+    private void cacheValues() {
+        // Settings
         combatTagDuration = config.getInt("settings.combat-tag-duration", 30);
         reengagementDuration = config.getInt("settings.reengagement-duration", 10);
         doppelSwapDuration = config.getInt("settings.doppel-swap-duration", 15);
         maxDuration = config.getInt("settings.max-duration", 60);
         maxSessionLength = config.getLong("settings.max-session-length", 300);
-
-        // General Settings
-        minimumOnlinePlayers = config.getInt("settings.minimum-online-players", 1);
-        doppelOnlyInCombat = config.getBoolean("settings.doppel-only-in-combat", true);
-        customQuitMessages = config.getBoolean("settings.custom-quit-messages", true);
+        debugMode = config.getBoolean("settings.debug-mode", false);
         customDeathMessages = config.getBoolean("settings.custom-death-messages", true);
 
-        // Combat Settings
-        rejoinPenaltiesEnabled = config.getBoolean("settings.rejoin-penalties.enabled", true);
-        rejoinHealthPenalty = config.getDouble("settings.rejoin-penalties.health-percent", 20.0);
-
-        // NPC Settings
-        npcGlow = config.getBoolean("settings.npc.glow", true);
-        npcDespawnDelay = config.getInt("settings.npc.despawn-delay", 300);
-        npcInvulnerable = config.getBoolean("settings.npc.invulnerable", false);
+        // Messages
+        inCombatMessage = config.getString("messages.in-combat", "&cYou are in combat for %seconds% more seconds!");
+        noLongerMessage = config.getString("messages.no-longer", "&aYou are no longer in combat.");
+        combatEngagedMessage = config.getString("messages.combat-engaged", "&cYou have entered combat!");
+        combatEngagedProjectileMessage = config.getString("messages.combat-engaged-projectile", "&cYou have entered combat due to projectile!");
+        combatDeathMessage = config.getString("messages.combat-death", "&c%victim% was slain by %killer% in combat!");
+        combatKillMessage = config.getString("messages.combat-kill", "&aYou are no longer in combat after defeating %victim%!");
+        combatLogDeathMessage = config.getString("messages.combat-log-death", "&cYou were killed by &6%killer%&c while logged out.");
+        stillInCombatMessage = config.getString("messages.still-in-combat", "&cYou are still in combat!");
+        offlineDeathMessage = config.getString("messages.offline-death", "&cYou were killed by &6%killer%&c while logged out.");
     }
 
-    private void loadMessages() {
-        messages.clear();
-
-        if (!config.isConfigurationSection("messages")) {
-            LogUtil.warn("No messages section found in config!");
-            return;
-        }
-
-        for (String key : config.getConfigurationSection("messages").getKeys(false)) {
-            String message = config.getString("messages." + key);
-            if (message != null) {
-                messages.put(key, MessageUtility.colorize(message));
-            }
-        }
-    }
-
-    private void validate() {
-        boolean valid = true;
-
-        // Validate combat timers
-        if (combatTagDuration <= 0) {
-            LogUtil.error("Invalid combat-tag-duration: Must be greater than 0", null);
-            valid = false;
-        }
-        if (maxDuration < combatTagDuration) {
-            LogUtil.error("Invalid max-duration: Must be greater than combat-tag-duration", null);
-            valid = false;
-        }
-        if (reengagementDuration <= 0) {
-            LogUtil.error("Invalid reengagement-duration: Must be greater than 0", null);
-            valid = false;
-        }
-        if (doppelSwapDuration <= 0) {
-            LogUtil.error("Invalid doppel-swap-duration: Must be greater than 0", null);
-            valid = false;
-        }
-
-        // Validate other numeric settings
-        if (minimumOnlinePlayers < 0) {
-            LogUtil.error("Invalid minimum-online-players: Must be 0 or greater", null);
-            valid = false;
-        }
-        if (rejoinHealthPenalty < 0 || rejoinHealthPenalty > 100) {
-            LogUtil.error("Invalid rejoin-health-penalty: Must be between 0 and 100", null);
-            valid = false;
-        }
-        if (npcDespawnDelay <= 0) {
-            LogUtil.error("Invalid npc-despawn-delay: Must be greater than 0", null);
-            valid = false;
-        }
-
-        if (!valid) {
-            LogUtil.error("Configuration validation failed - using default values", null);
-        }
-    }
-
-    public String getMessage(String key) {
-        return messages.getOrDefault(key, "Missing message: " + key);
-    }
-
-    public String getMessage(String key, String... replacements) {
-        String message = getMessage(key);
-        for (int i = 0; i < replacements.length; i += 2) {
-            if (i + 1 < replacements.length) {
-                message = message.replace(replacements[i], replacements[i + 1]);
-            }
-        }
-        return message;
-    }
 }

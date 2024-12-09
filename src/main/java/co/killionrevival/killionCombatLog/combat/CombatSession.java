@@ -1,16 +1,16 @@
 package co.killionrevival.killioncombatlog.combat;
 
 import lombok.Getter;
+
 import java.util.UUID;
 
 /**
  * Represents a combat session between exactly two entities.
- * A session is strictly 1v1, representing a fight between a combatant (attacker)
- * and a victim (defender).
+ * Handles timing, re-engagement, and ending conditions.
  */
 public class CombatSession {
-    @Getter private final UUID combatantId;  // The attacker/initiator
-    @Getter private final UUID victimId;     // The defender/target
+    @Getter private final UUID combatantId;
+    @Getter private final UUID victimId;
     @Getter private int remainingSeconds;
     @Getter private long totalSessionTime;
     private final long startTime;
@@ -21,10 +21,6 @@ public class CombatSession {
     private final int doppelSwapDuration;
     private final long maxSessionLength;
 
-    /**
-     * Creates a new 1v1 combat session between two entities.
-     * @throws IllegalArgumentException if combatant and victim are the same entity
-     */
     public CombatSession(CombatEntity combatant,
                          CombatEntity victim,
                          int initialDuration,
@@ -32,12 +28,12 @@ public class CombatSession {
                          int doppelSwapDuration,
                          int maxDuration,
                          long maxSessionLength) {
-        if (combatant.getEntityId().equals(victim.getEntityId())) {
+        if (combatant.getPlayerId().equals(victim.getPlayerId())) {
             throw new IllegalArgumentException("Cannot create combat session with self");
         }
 
-        this.combatantId = combatant.getEntityId();
-        this.victimId = victim.getEntityId();
+        this.combatantId = combatant.getPlayerId();
+        this.victimId = victim.getPlayerId();
         this.initialDuration = initialDuration;
         this.reengagementDuration = reengagementDuration;
         this.doppelSwapDuration = doppelSwapDuration;
@@ -48,9 +44,6 @@ public class CombatSession {
         this.totalSessionTime = 0;
     }
 
-    /**
-     * Called when the original pair re-engages in combat
-     */
     public boolean handleReengagement(UUID entityId) {
         if (!hasEntity(entityId)) {
             return false;
@@ -59,9 +52,6 @@ public class CombatSession {
         return true;
     }
 
-    /**
-     * Called when a Doppel swaps in for one of the original entities
-     */
     public boolean handleDoppelSwap(UUID originalId) {
         if (!hasEntity(originalId)) {
             return false;
@@ -70,9 +60,6 @@ public class CombatSession {
         return true;
     }
 
-    /**
-     * Handles an entity death and determines if it ends combat
-     */
     public CombatEndReason handleDeath(UUID deadEntityId) {
         if (deadEntityId.equals(victimId)) {
             return CombatEndReason.COMBATANT_VICTORY;
@@ -83,13 +70,10 @@ public class CombatSession {
         return CombatEndReason.NONE;
     }
 
-    /**
-     * Updates the timer and checks if combat should end
-     */
     public CombatEndReason tick() {
         totalSessionTime = System.currentTimeMillis() - startTime;
 
-        if (totalSessionTime / 1000 >= maxSessionLength) {
+        if ((totalSessionTime / 1000) >= maxSessionLength) {
             return CombatEndReason.MAX_SESSION_LENGTH_EXCEEDED;
         }
 
@@ -104,32 +88,16 @@ public class CombatSession {
         return CombatEndReason.NONE;
     }
 
-    /**
-     * Gets whether an entity is part of this session
-     */
     public boolean hasEntity(UUID entityId) {
         return combatantId.equals(entityId) || victimId.equals(entityId);
     }
 
-    /**
-     * Gets the opponent's ID for the given entity
-     */
     public UUID getOpponentId(UUID entityId) {
         if (combatantId.equals(entityId)) return victimId;
         if (victimId.equals(entityId)) return combatantId;
         return null;
     }
 
-    /**
-     * Force sets the remaining time to a specific value
-     */
-    public void setRemainingTime(int seconds) {
-        this.remainingSeconds = Math.min(seconds, maxDuration);
-    }
-
-    /**
-     * Forces the combat session to end immediately
-     */
     public void forceEnd(CombatEndReason reason) {
         this.remainingSeconds = 0;
     }

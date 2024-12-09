@@ -2,6 +2,7 @@ package co.killionrevival.killioncombatlog.combat;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.util.LogUtil;
+import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -9,7 +10,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Manages the creation and tracking of combat sessions and their timers
+ * Manages the ticking and tracking of combat sessions.
+ * Handles combat display updates and session lifecycle.
  */
 public class CombatSessionManager {
     private final KillionCombatLog plugin;
@@ -22,13 +24,12 @@ public class CombatSessionManager {
     private final Set<CombatSession> activeSessions = new HashSet<>();
     private BukkitTask tickTask;
 
-    public CombatSessionManager(
-            KillionCombatLog plugin,
-            int initialDuration,
-            int reengagementDuration,
-            int doppelSwapDuration,
-            int maxDuration,
-            long maxSessionLength) {
+    public CombatSessionManager(KillionCombatLog plugin,
+                                int initialDuration,
+                                int reengagementDuration,
+                                int doppelSwapDuration,
+                                int maxDuration,
+                                long maxSessionLength) {
         this.plugin = plugin;
         this.initialDuration = initialDuration;
         this.reengagementDuration = reengagementDuration;
@@ -37,18 +38,13 @@ public class CombatSessionManager {
         this.maxSessionLength = maxSessionLength;
     }
 
-    /**
-     * Creates a new combat session between two entities if one doesn't already exist
-     * @return The new or existing session between these entities
-     */
     public CombatSession createSession(CombatEntity combatant, CombatEntity victim) {
-        // Check if a session already exists between these entities
-        CombatSession existingSession = combatant.getSessionWith(victim.getEntityId());
-        if (existingSession != null) {
-            return existingSession;
+        // Ensure no duplicate sessions for the same pair
+        if (combatant.getSessionWith(victim.getPlayerId()) != null) {
+            // Session already exists, just return that
+            return combatant.getSessionWith(victim.getPlayerId());
         }
 
-        // Create new session
         CombatSession session = new CombatSession(
                 combatant,
                 victim,
@@ -59,34 +55,27 @@ public class CombatSessionManager {
                 maxSessionLength
         );
 
-        // Add to both entities
-        if (combatant.addCombatSession(session) && victim.addCombatSession(session)) {
-            activeSessions.add(session);
-            startTickTask();
-            LogUtil.debug(String.format("Created new combat session between %s and %s",
-                    combatant.getEntityId(), victim.getEntityId()));
-        }
+        activeSessions.add(session);
+        startTickTask();
+        LogUtil.debug(String.format("Created new combat session between %s and %s",
+                combatant.getPlayerId(), victim.getPlayerId()));
+
+        // Initial combat display update
+        updateCombatDisplays(session);
 
         return session;
     }
 
-    /**
-     * Removes a session from tracking
-     */
     public void removeSession(CombatSession session) {
         activeSessions.remove(session);
         LogUtil.debug("Removed combat session from tracking");
 
-        // Stop tick task if no more sessions
         if (activeSessions.isEmpty() && tickTask != null) {
             tickTask.cancel();
             tickTask = null;
         }
     }
 
-    /**
-     * Starts the timer tick task if not already running
-     */
     private void startTickTask() {
         if (tickTask != null) return;
 
@@ -97,15 +86,18 @@ public class CombatSessionManager {
 
                 for (CombatSession session : activeSessions) {
                     CombatEndReason reason = session.tick();
+
+                    // Update displays for both players
+                    updateCombatDisplays(session);
+
                     if (reason != CombatEndReason.NONE) {
                         sessionsToRemove.add(session);
+                        plugin.getCombatManager().endCombatSession(session, reason);
                     }
                 }
 
-                // Clean up ended sessions
                 sessionsToRemove.forEach(CombatSessionManager.this::removeSession);
 
-                // Stop task if no more sessions
                 if (activeSessions.isEmpty()) {
                     cancel();
                     tickTask = null;
@@ -114,21 +106,30 @@ public class CombatSessionManager {
         }.runTaskTimer(plugin, 20L, 20L);
     }
 
-    /**
-     * Cleans up all sessions
-     */
+    private void updateCombatDisplays(CombatSession session) {
+        Player combatant = plugin.getServer().getPlayer(session.getCombatantId());
+        Player victim = plugin.getServer().getPlayer(session.getVictimId());
+
+        if (combatant != null) {
+            plugin.getCombatManager().updateCombatDisplay(combatant);
+        }
+        if (victim != null) {
+            plugin.getCombatManager().updateCombatDisplay(victim);
+        }
+    }
+
     public void shutdown() {
         if (tickTask != null) {
             tickTask.cancel();
             tickTask = null;
         }
+        for (CombatSession session : new HashSet<>(activeSessions)) {
+            plugin.getCombatManager().endCombatSession(session, CombatEndReason.TIMER_EXPIRED);
+        }
         activeSessions.clear();
         LogUtil.info("Combat session manager shutdown complete");
     }
 
-    /**
-     * Gets all active combat sessions
-     */
     public Set<CombatSession> getActiveSessions() {
         return new HashSet<>(activeSessions);
     }

@@ -9,11 +9,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 
-import java.util.UUID;
-
-/**
- * Handles death-related events in combat situations.
- */
 @RequiredArgsConstructor
 public class CombatDeathListener implements Listener {
     private final KillionCombatLog plugin;
@@ -26,24 +21,17 @@ public class CombatDeathListener implements Listener {
         if (plugin.getCombatManager().isInCombat(victim)) {
             plugin.getCombatManager().handlePlayerDeath(victim, killer);
 
-            if (plugin.getConfig().getBoolean("settings.custom-death-messages", true)) {
-                String message = plugin.getConfig().getString(
-                                "messages.combat-death",
-                                "&c%victim% was slain by %killer% in combat!"
-                        )
+            if (plugin.getConfigManager().isCustomDeathMessages()) {
+                String message = plugin.getConfigManager().getCombatDeathMessage()
                         .replace("%victim%", victim.getName())
                         .replace("%killer%", killer != null ? killer.getName() : "unknown");
-
                 event.setDeathMessage(MessageUtility.colorize(message));
             }
         }
 
         if (killer != null && plugin.getCombatManager().isInCombat(killer)) {
-            String message = plugin.getConfig().getString(
-                    "messages.combat-kill",
-                    "&aYou are no longer in combat after defeating %victim%!"
-            ).replace("%victim%", victim.getName());
-
+            String message = plugin.getConfigManager().getCombatKillMessage()
+                    .replace("%victim%", victim.getName());
             killer.sendMessage(MessageUtility.chatComponent(message));
         }
     }
@@ -51,21 +39,18 @@ public class CombatDeathListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onLoginDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
-        UUID playerUUID = player.getUniqueId();
 
-        if (!plugin.getCombatLogManager().hasDeathRecord(playerUUID)) {
+        if (!plugin.getCombatLogManager().hasDeathRecord(player.getUniqueId())) {
             return;
         }
 
-        String killerName = plugin.getCombatLogManager().getKillerName(playerUUID);
+        String killerName = plugin.getCombatLogManager().getKillerName(player.getUniqueId());
 
         event.setDeathMessage(null);
-        String message = plugin.getConfig().getString(
-                "messages.offline-death",
-                "&cYou were killed by &6%killer%&c while logged out."
-        ).replace("%killer%", killerName != null ? killerName : "unknown");
+        String message = plugin.getConfigManager().getOfflineDeathMessage()
+                .replace("%killer%", killerName != null ? killerName : "unknown");
 
         player.sendMessage(MessageUtility.chatComponent(message));
-        plugin.getCombatLogManager().removeDeathRecord(playerUUID);
+        plugin.getCombatLogManager().removeDeathRecord(player.getUniqueId());
     }
 }

@@ -1,18 +1,23 @@
 package co.killionrevival.killioncombatlog.npc;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
-import co.killionrevival.killioncombatlog.util.LogUtil;
 import co.killionrevival.killioncombatlog.combat.Doppel;
+import co.killionrevival.killioncombatlog.util.LogUtil;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.npc.*;
-import net.citizensnpcs.api.trait.trait.*;
+import net.citizensnpcs.api.trait.trait.Equipment;
+import net.citizensnpcs.api.trait.trait.Inventory;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.UUID;
 
+/**
+ * Manages the creation and removal of NPCs (Doppels).
+ */
 public class NPCManager {
     private final KillionCombatLog plugin;
     private final NPCRegistry npcRegistry;
@@ -24,12 +29,13 @@ public class NPCManager {
     }
 
     public NPC createNPC(Doppel doppel, Player originalPlayer) {
-        LogUtil.debug(String.format("Creating NPC for Doppel of player %s at location %s",
+        LogUtil.debug(String.format("Creating NPC Doppel for player %s at %s",
                 originalPlayer.getName(), originalPlayer.getLocation()));
 
-        NPC npc = npcRegistry.createNPC(originalPlayer.getType(), originalPlayer.getName());
-        npc.spawn(originalPlayer.getLocation());
-        LogUtil.debug("NPC spawned successfully");
+        NPC npc = npcRegistry.createNPC(EntityType.PLAYER, originalPlayer.getName());
+        if (!npc.isSpawned()) {
+            npc.spawn(originalPlayer.getLocation());
+        }
 
         if (npc.getEntity() instanceof Player npcPlayer) {
             AttributeInstance maxHealthAttr = originalPlayer.getAttribute(Attribute.MAX_HEALTH);
@@ -41,14 +47,12 @@ public class NPCManager {
                 }
             }
             npcPlayer.setHealth(doppel.getHealth());
-
-            LogUtil.debug(String.format("Set NPC health to %s", doppel.getHealth()));
         }
 
         npc.getNavigator().getDefaultParameters().baseSpeed(0.8f);
 
-        LogUtil.debug("Copying player equipment to NPC...");
-        Equipment equipment = npc.getTrait(Equipment.class);
+        // Copy equipment
+        Equipment equipment = npc.getOrAddTrait(Equipment.class);
         equipment.set(Equipment.EquipmentSlot.HELMET, originalPlayer.getInventory().getHelmet());
         equipment.set(Equipment.EquipmentSlot.CHESTPLATE, originalPlayer.getInventory().getChestplate());
         equipment.set(Equipment.EquipmentSlot.LEGGINGS, originalPlayer.getInventory().getLeggings());
@@ -56,15 +60,19 @@ public class NPCManager {
         equipment.set(Equipment.EquipmentSlot.HAND, originalPlayer.getInventory().getItemInMainHand());
         equipment.set(Equipment.EquipmentSlot.OFF_HAND, originalPlayer.getInventory().getItemInOffHand());
 
-        LogUtil.debug("Copying player inventory to NPC...");
-        Inventory npcInventory = npc.getTrait(Inventory.class);
+        // Copy inventory
+        Inventory npcInv = npc.getOrAddTrait(Inventory.class);
         ItemStack[] playerInventory = originalPlayer.getInventory().getContents();
         for (int i = 0; i < playerInventory.length; i++) {
             ItemStack item = playerInventory[i];
             if (item != null) {
-                npcInventory.setItem(i, item);
+                npcInv.setItem(i, item);
             }
         }
+
+        npc.data().set("owner-uuid", originalPlayer.getUniqueId());
+
+        doppel.setNPC(npc);
 
         LogUtil.combat(String.format("Created Doppel NPC for player %s with ID %s",
                 originalPlayer.getName(), npc.getUniqueId()));

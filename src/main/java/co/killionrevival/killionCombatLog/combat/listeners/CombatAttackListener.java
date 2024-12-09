@@ -13,9 +13,6 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.projectiles.ProjectileSource;
 
-/**
- * Handles combat initiation through attacks
- */
 @RequiredArgsConstructor
 public class CombatAttackListener implements Listener {
     private final KillionCombatLog plugin;
@@ -29,8 +26,8 @@ public class CombatAttackListener implements Listener {
         Player attacker = null;
         if (event.getDamager() instanceof Player) {
             attacker = (Player) event.getDamager();
-        } else if (event.getDamager() instanceof Projectile) {
-            ProjectileSource shooter = ((Projectile) event.getDamager()).getShooter();
+        } else if (event.getDamager() instanceof Projectile projectile) {
+            ProjectileSource shooter = projectile.getShooter();
             if (shooter instanceof Player) {
                 attacker = (Player) shooter;
             }
@@ -41,9 +38,9 @@ public class CombatAttackListener implements Listener {
         }
 
         if (WorldGuardHelper.isPvPEnabled(victim.getLocation())) {
-            LogUtil.debug(String.format("Initiating combat between %s and %s",
+            LogUtil.debug(String.format("Combat engagement between %s and %s",
                     attacker.getName(), victim.getName()));
-            plugin.getCombatManager().initiateCombat(attacker, victim);
+            plugin.getEntityManager().getEntity(victim).handlePlayerDamage(attacker);
         }
     }
 
@@ -62,9 +59,9 @@ public class CombatAttackListener implements Listener {
         }
 
         if (WorldGuardHelper.isPvPEnabled(victim.getLocation())) {
-            LogUtil.debug(String.format("Initiating combat from projectile between %s and %s",
+            LogUtil.debug(String.format("Combat engagement from projectile between %s and %s",
                     attacker.getName(), victim.getName()));
-            plugin.getCombatManager().initiateCombat(attacker, victim);
+            plugin.getEntityManager().getEntity(victim).handlePlayerDamage(attacker);
         }
     }
 }

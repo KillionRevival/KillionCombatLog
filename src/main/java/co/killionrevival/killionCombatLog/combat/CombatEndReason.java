@@ -1,20 +1,17 @@
 package co.killionrevival.killioncombatlog.combat;
 
 /**
- * Reasons why a combat session might end
+ * Reasons why a combat session might end.
  */
 public enum CombatEndReason {
-    NONE,                       // Combat hasn't ended
-    TIMER_EXPIRED,             // No engagement within timer duration
-    MAX_SESSION_LENGTH_EXCEEDED, // Total session length exceeded maximum
-    COMBATANT_VICTORY,         // Combatant killed the victim
-    VICTIM_VICTORY,            // Victim killed the combatant
-    MUTUAL_DEATH,              // Both died simultaneously (edge case)
-    ENTERED_SAFE_ZONE;         // Combat ended because player entered a safe zone
+    NONE,
+    TIMER_EXPIRED,
+    MAX_SESSION_LENGTH_EXCEEDED,
+    COMBATANT_VICTORY,
+    VICTIM_VICTORY,
+    MUTUAL_DEATH,
+    ENTERED_SAFE_ZONE;
 
-    /**
-     * Returns a friendly message for why combat ended
-     */
     public String getMessage() {
         return switch (this) {
             case NONE -> "Combat is ongoing";
@@ -27,9 +24,6 @@ public enum CombatEndReason {
         };
     }
 
-    /**
-     * Returns whether this is a victory condition
-     */
     public boolean isVictoryCondition() {
         return this == COMBATANT_VICTORY ||
                 this == VICTIM_VICTORY ||
