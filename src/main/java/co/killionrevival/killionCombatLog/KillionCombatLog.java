@@ -4,6 +4,7 @@ import co.killionrevival.killioncombatlog.combat.*;
 import co.killionrevival.killioncombatlog.combat.listeners.*;
 import co.killionrevival.killioncombatlog.commands.KCLCommand;
 import co.killionrevival.killioncombatlog.config.ConfigManager;
+import co.killionrevival.killioncombatlog.database.DatabaseManager;
 import co.killionrevival.killioncombatlog.logger.CombatLogManager;
 import co.killionrevival.killioncombatlog.npc.NPCManager;
 import co.killionrevival.killioncombatlog.npc.TraitManager;
@@ -14,10 +15,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
-/**
- * Main plugin class for KillionCombatLog.
- * Initializes and manages all systems including Combat Entities, Sessions, Doppels, and Logging.
- */
+@Getter
 public final class KillionCombatLog extends JavaPlugin {
     @Getter
     private CombatSessionManager combatSessionManager;
@@ -31,6 +29,7 @@ public final class KillionCombatLog extends JavaPlugin {
     private TraitManager traitManager;
     @Getter
     private ConfigManager configManager;
+    private DatabaseManager databaseManager;
 
     @Override
     public void onLoad() {
@@ -65,6 +64,9 @@ public final class KillionCombatLog extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+
+        // Initialize DatabaseManager first
+        this.databaseManager = new DatabaseManager(this);
 
         // Initialize ConfigManager
         this.configManager = new ConfigManager(this);
@@ -117,12 +119,14 @@ public final class KillionCombatLog extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // Cleanup in reverse order of initialization
         if (combatManager != null) {
             combatManager.shutdown();
         }
         if (combatSessionManager != null) {
             combatSessionManager.shutdown();
+        }
+        if (databaseManager != null) {
+            databaseManager.cleanup();
         }
 
         LogUtil.info("KillionCombatLog disabled successfully.");
