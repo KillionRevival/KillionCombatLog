@@ -3,6 +3,7 @@ package co.killionrevival.killioncombatlog.combat.listeners;
 import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.combat.CombatEntity;
 import co.killionrevival.killioncombatlog.logger.PlayerCombatLogEvent;
+import co.killionrevival.killioncombatlog.util.LogUtil;
 import co.killionrevival.killioncombatlog.util.WorldGuardHelper;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.entity.Player;
@@ -50,11 +51,18 @@ public class CombatDisconnectListener implements Listener {
 
         boolean isPvPZone = WorldGuardHelper.isPvPEnabled(player.getLocation());
 
-        // If player is in combat and leaves in PvP zone, call event
-        if (entity.isInCombat() && isPvPZone && plugin.getServer().getOnlinePlayers().size() > 1) {
-            plugin.getServer().getPluginManager().callEvent(new PlayerCombatLogEvent(player));
+        LogUtil.debug(String.format("Player %s quit. PvP Zone: %b, In Combat: %b",
+            player.getName(), isPvPZone, entity.isInCombat()));
+
+        if (isPvPZone) {
+            LogUtil.debug("Processing PvP zone logout for " + player.getName());
+            entity.handleLogout(true);
+
+            if (entity.isInCombat() && plugin.getServer().getOnlinePlayers().size() > 1) {
+                plugin.getServer().getPluginManager().callEvent(new PlayerCombatLogEvent(player));
+            }
         } else {
-            // If not in pvp zone or not in combat, just handle logout (no Doppel)
+            LogUtil.debug("Processing non-PvP zone logout for " + player.getName());
             entity.handleLogout(false);
         }
     }
@@ -66,7 +74,7 @@ public class CombatDisconnectListener implements Listener {
         if (entity == null) return;
 
         if (entity.hasDoppel()) {
-            // Player logged back in while Doppel was active
+            LogUtil.debug("Player " + player.getName() + " rejoined with active Doppel");
             entity.handleLoginWithDoppel(player);
         }
     }

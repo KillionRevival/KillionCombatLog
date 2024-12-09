@@ -4,30 +4,24 @@ import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.util.LogUtil;
 import lombok.Getter;
 import lombok.Setter;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Centralizes logic for a player’s combat state, including their Doppel.
- * Handles damage, logout, doppel creation, and session interactions.
- */
 public class CombatEntity {
     private final KillionCombatLog plugin;
     @Getter
     private final UUID playerId;
-    /**
-     * -- SETTER --
-     *  Called when this player's actual Player object changes (e.g. on join).
-     */
     @Setter
     @Getter
-    private Player player; // Current online player (if online)
+    private Player player;
     @Getter
     private Doppel doppel;
-    // Active sessions involving this entity
     private final Set<CombatSession> activeSessions = new HashSet<>();
 
     public CombatEntity(KillionCombatLog plugin, Player player) {
@@ -40,9 +34,6 @@ public class CombatEntity {
         return doppel != null;
     }
 
-    /**
-     * Called when the player takes damage from another player.
-     */
     public void handlePlayerDamage(Player attacker) {
         if (attacker.getUniqueId().equals(playerId)) return;
 
@@ -50,87 +41,100 @@ public class CombatEntity {
         handleCombatSession(attackerEntity);
     }
 
-    /**
-     * Called when the Doppel takes damage from another player.
-     */
     public void handleDoppelDamage(Player attacker) {
         if (attacker.getUniqueId().equals(playerId)) return;
 
+        LogUtil.debug("Processing Doppel damage from " + attacker.getName());
         CombatEntity attackerEntity = plugin.getEntityManager().getEntity(attacker);
-        // Handle session creation or reengagement
         CombatSession session = handleCombatSession(attackerEntity);
 
         if (session != null) {
-            // Reengage to extend the timer, simulating re-engagement/doppel swap logic
-            session.handleReengagement(attacker.getUniqueId());
+            LogUtil.debug("Extending session time due to Doppel damage");
+            session.handleDoppelSwap(playerId);
+            LogUtil.debug("New session time: " + session.getRemainingSeconds() + "s");
         }
     }
 
-    /**
-     * Handles creating or re-engaging a combat session with the given attacker.
-     * Returns the session involved.
-     */
     private CombatSession handleCombatSession(CombatEntity attackerEntity) {
         if (attackerEntity == null || attackerEntity == this) return null;
 
         CombatSession existingSession = getSessionWith(attackerEntity.getPlayerId());
         if (existingSession == null) {
-            // Create a new session
+            LogUtil.debug("Creating new combat session between " + playerId + " and " + attackerEntity.getPlayerId());
             CombatSession newSession = plugin.getCombatSessionManager().createSession(attackerEntity, this);
             attackerEntity.addSession(newSession);
             this.addSession(newSession);
 
-            // If either entity wasn't in combat before, trigger events
             if (!attackerEntity.isInCombat() && attackerEntity.getPlayer() != null) {
-                plugin.getServer().getPluginManager().callEvent(new PlayerCombatStateChangedEvent(attackerEntity.getPlayer(), true));
+                plugin.getServer().getPluginManager().callEvent(
+                    new PlayerCombatStateChangedEvent(attackerEntity.getPlayer(), true));
             }
             if (!isInCombat() && getPlayer() != null) {
-                plugin.getServer().getPluginManager().callEvent(new PlayerCombatStateChangedEvent(getPlayer(), true));
+                plugin.getServer().getPluginManager().callEvent(
+                    new PlayerCombatStateChangedEvent(getPlayer(), true));
             }
 
             return newSession;
         } else {
-            // Session exists, just re-engage it
+            LogUtil.debug("Reengaging existing session");
             existingSession.handleReengagement(attackerEntity.getPlayerId());
             return existingSession;
         }
     }
 
-    /**
-     * Called when the player logs out.
-     * If in PvP zone, spawn doppel. Otherwise, just clear sessions.
-     */
     public void handleLogout(boolean isPvPZone) {
+        LogUtil.debug(String.format("Handling logout for player %s. PvP Zone: %b, In Combat: %b",
+            player.getName(), isPvPZone, isInCombat()));
+
         if (!isPvPZone) {
-            // Non-pvp zone logout: just end sessions gracefully
+            LogUtil.debug("Non-PvP zone logout, ending combat sessions");
             for (CombatSession session : new HashSet<>(activeSessions)) {
                 session.forceEnd(CombatEndReason.TIMER_EXPIRED);
-                // The session manager + combat manager will handle cleanup
                 plugin.getCombatManager().endCombatSession(session, CombatEndReason.TIMER_EXPIRED);
             }
             activeSessions.clear();
             return;
         }
 
-        // In PvP zone, create Doppel
         if (player != null) {
+            LogUtil.debug(String.format("Creating Doppel for player %s with health %f",
+                player.getName(), player.getHealth()));
             this.doppel = new Doppel(player.getUniqueId(), player.getHealth(), player.getInventory().getContents());
             plugin.getNPCManager().createNPC(doppel, player);
-            LogUtil.debug("Doppel created for player " + player.getName());
+
+            // If not in combat, start a despawn timer
+            if (!isInCombat()) {
+                int defaultDuration = plugin.getConfigManager().getDoppelDefaultDuration();
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        if (hasDoppel() && !isInCombat()) {
+                            LogUtil.debug("Removing non-combat Doppel after timeout");
+                            removeDoppel();
+                        }
+                    }
+                }.runTaskLater(plugin, defaultDuration * 20L);
+            }
         }
     }
 
-    /**
-     * Called when player re-logs in while Doppel exists.
-     * Transfers Doppel state back to player and remove Doppel.
-     */
     public void handleLoginWithDoppel(Player player) {
         this.player = player;
-        if (doppel != null) {
-            doppel.transferToPlayer(player);
+        if (doppel != null && doppel.getNpc() != null) {
+            LogUtil.debug("Transferring Doppel state back to player " + player.getName());
+
+            // Get final health from NPC if it exists
+            Double finalHealth = doppel.getNpc().data().get("final-health");
+            if (finalHealth != null) {
+                LogUtil.debug("Setting player health to Doppel's final health: " + finalHealth);
+                player.setHealth(Math.max(0.1, Math.min(Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getValue(), finalHealth)));
+            } else {
+                // Fall back to original Doppel health
+                player.setHealth(Math.max(0.1, Math.min(Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).getValue(), doppel.getHealth())));
+            }
+
             removeDoppel();
 
-            // If still in combat, notify player
             if (isInCombat()) {
                 plugin.getServer().getPluginManager().callEvent(
                         new PlayerCombatStateChangedEvent(player, true)
@@ -146,25 +150,22 @@ public class CombatEntity {
         }
     }
 
-    /**
-     * Removes the Doppel if it exists.
-     */
     public void removeDoppel() {
         if (doppel != null) {
-            // Remove the Doppel's NPC using NPCManager
+            LogUtil.debug("Removing Doppel for player " + playerId);
             plugin.getNPCManager().removeNPC(doppel.getNpc());
             doppel = null;
         }
     }
 
-
     public void handleSafeZoneEntry() {
-        // Force end all sessions
+        LogUtil.debug("Safe zone entry for " + playerId);
         for (CombatSession session : new HashSet<>(activeSessions)) {
             session.forceEnd(CombatEndReason.ENTERED_SAFE_ZONE);
             plugin.getCombatManager().endCombatSession(session, CombatEndReason.ENTERED_SAFE_ZONE);
         }
         activeSessions.clear();
+        removeDoppel();
     }
 
     public boolean isInCombat() {
@@ -180,10 +181,12 @@ public class CombatEntity {
 
     public void addSession(CombatSession session) {
         activeSessions.add(session);
+        LogUtil.debug("Added combat session for " + playerId + ". Total sessions: " + activeSessions.size());
     }
 
     public void removeSession(CombatSession session) {
         activeSessions.remove(session);
+        LogUtil.debug("Removed combat session for " + playerId + ". Remaining sessions: " + activeSessions.size());
     }
 
     public Set<CombatSession> getActiveSessionsSnapshot() {

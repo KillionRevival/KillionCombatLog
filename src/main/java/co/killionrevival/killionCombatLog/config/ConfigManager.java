@@ -23,6 +23,8 @@ public class ConfigManager {
     private boolean debugMode;
     @Getter
     private boolean customDeathMessages;
+    @Getter
+    private int doppelDefaultDuration;
 
     // Messages
     @Getter
@@ -48,29 +50,20 @@ public class ConfigManager {
         this.plugin = plugin;
     }
 
-    /**
-     * Loads the configuration from the config.yml file, sets defaults, and caches values.
-     */
     public void loadConfig() {
         plugin.saveDefaultConfig();
-        plugin.reloadConfig(); // Ensure latest values are loaded
+        plugin.reloadConfig();
         this.config = plugin.getConfig();
         setDefaults();
         cacheValues();
     }
 
-    /**
-     * Reloads the configuration and updates cached values.
-     */
     public void reloadConfig() {
         plugin.reloadConfig();
         this.config = plugin.getConfig();
         cacheValues();
     }
 
-    /**
-     * Sets default values for config keys if they are not present.
-     */
     private void setDefaults() {
         config.addDefault("settings.combat-tag-duration", 30);
         config.addDefault("settings.reengagement-duration", 10);
@@ -79,6 +72,7 @@ public class ConfigManager {
         config.addDefault("settings.max-session-length", 300);
         config.addDefault("settings.debug-mode", false);
         config.addDefault("settings.custom-death-messages", true);
+        config.addDefault("settings.doppel-default-duration", 30);
 
         config.addDefault("messages.in-combat", "&cYou are in combat for %seconds% more seconds!");
         config.addDefault("messages.no-longer", "&aYou are no longer in combat.");
@@ -94,9 +88,6 @@ public class ConfigManager {
         plugin.saveConfig();
     }
 
-    /**
-     * Reads values from the config into memory.
-     */
     private void cacheValues() {
         // Settings
         combatTagDuration = config.getInt("settings.combat-tag-duration", 30);
@@ -106,6 +97,7 @@ public class ConfigManager {
         maxSessionLength = config.getLong("settings.max-session-length", 300);
         debugMode = config.getBoolean("settings.debug-mode", false);
         customDeathMessages = config.getBoolean("settings.custom-death-messages", true);
+        doppelDefaultDuration = config.getInt("settings.doppel-default-duration", 30);
 
         // Messages
         inCombatMessage = config.getString("messages.in-combat", "&cYou are in combat for %seconds% more seconds!");

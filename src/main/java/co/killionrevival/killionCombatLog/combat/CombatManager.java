@@ -1,6 +1,7 @@
 package co.killionrevival.killioncombatlog.combat;
 
 import co.killionrevival.killioncombatlog.KillionCombatLog;
+import co.killionrevival.killioncombatlog.util.LogUtil;
 import co.killionrevival.killioncombatlog.util.MessageUtility;
 import org.bukkit.entity.Player;
 
@@ -76,6 +77,11 @@ public class CombatManager {
         if (entity1 != null) {
             entity1.removeSession(session);
             if (!entity1.isInCombat()) {
+                // If no longer in combat, remove Doppel if exists
+                if (entity1.hasDoppel()) {
+                    LogUtil.debug("Removing Doppel for entity1 as combat ended");
+                    entity1.removeDoppel();
+                }
                 Player p = plugin.getServer().getPlayer(entity1.getPlayerId());
                 if (p != null) {
                     p.sendActionBar(MessageUtility.chatComponent("")); // Clear action bar
@@ -89,6 +95,11 @@ public class CombatManager {
         if (entity2 != null) {
             entity2.removeSession(session);
             if (!entity2.isInCombat()) {
+                // If no longer in combat, remove Doppel if exists
+                if (entity2.hasDoppel()) {
+                    LogUtil.debug("Removing Doppel for entity2 as combat ended");
+                    entity2.removeDoppel();
+                }
                 Player p = plugin.getServer().getPlayer(entity2.getPlayerId());
                 if (p != null) {
                     p.sendActionBar(MessageUtility.chatComponent("")); // Clear action bar

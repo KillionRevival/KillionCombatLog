@@ -1,13 +1,10 @@
 package co.killionrevival.killioncombatlog.combat;
 
+import co.killionrevival.killioncombatlog.util.LogUtil;
 import lombok.Getter;
 
 import java.util.UUID;
 
-/**
- * Represents a combat session between exactly two entities.
- * Handles timing, re-engagement, and ending conditions.
- */
 public class CombatSession {
     @Getter private final UUID combatantId;
     @Getter private final UUID victimId;
@@ -42,13 +39,18 @@ public class CombatSession {
         this.remainingSeconds = initialDuration;
         this.startTime = System.currentTimeMillis();
         this.totalSessionTime = 0;
+
+        LogUtil.debug(String.format("Created combat session: initial=%d, reengagement=%d, doppelSwap=%d, max=%d",
+                initialDuration, reengagementDuration, doppelSwapDuration, maxDuration));
     }
 
     public boolean handleReengagement(UUID entityId) {
         if (!hasEntity(entityId)) {
             return false;
         }
+        int previousTime = remainingSeconds;
         this.remainingSeconds = Math.min(remainingSeconds + reengagementDuration, maxDuration);
+        LogUtil.debug(String.format("Reengagement: %d -> %d seconds", previousTime, remainingSeconds));
         return true;
     }
 
@@ -56,7 +58,9 @@ public class CombatSession {
         if (!hasEntity(originalId)) {
             return false;
         }
+        int previousTime = remainingSeconds;
         this.remainingSeconds = Math.min(remainingSeconds + doppelSwapDuration, maxDuration);
+        LogUtil.debug(String.format("Doppel swap: %d -> %d seconds", previousTime, remainingSeconds));
         return true;
     }
 
@@ -72,8 +76,10 @@ public class CombatSession {
 
     public CombatEndReason tick() {
         totalSessionTime = System.currentTimeMillis() - startTime;
+        LogUtil.debug(String.format("Session tick - Remaining: %d, Total: %d", remainingSeconds, totalSessionTime/1000));
 
         if ((totalSessionTime / 1000) >= maxSessionLength) {
+            LogUtil.debug("Session exceeded max length");
             return CombatEndReason.MAX_SESSION_LENGTH_EXCEEDED;
         }
 
@@ -82,6 +88,7 @@ public class CombatSession {
         }
 
         if (remainingSeconds <= 0) {
+            LogUtil.debug("Session timer expired");
             return CombatEndReason.TIMER_EXPIRED;
         }
 
@@ -99,6 +106,7 @@ public class CombatSession {
     }
 
     public void forceEnd(CombatEndReason reason) {
+        LogUtil.debug(String.format("Force ending session with reason: %s", reason));
         this.remainingSeconds = 0;
     }
 }

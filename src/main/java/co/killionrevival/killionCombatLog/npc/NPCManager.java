@@ -15,9 +15,6 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.UUID;
 
-/**
- * Manages the creation and removal of NPCs (Doppels).
- */
 public class NPCManager {
     private final KillionCombatLog plugin;
     private final NPCRegistry npcRegistry;
@@ -32,51 +29,53 @@ public class NPCManager {
         LogUtil.debug(String.format("Creating NPC Doppel for player %s at %s",
                 originalPlayer.getName(), originalPlayer.getLocation()));
 
-        NPC npc = npcRegistry.createNPC(EntityType.PLAYER, originalPlayer.getName());
-        if (!npc.isSpawned()) {
-            npc.spawn(originalPlayer.getLocation());
-        }
+        try {
+            NPC npc = npcRegistry.createNPC(EntityType.PLAYER, originalPlayer.getName());
 
-        if (npc.getEntity() instanceof Player npcPlayer) {
-            AttributeInstance maxHealthAttr = originalPlayer.getAttribute(Attribute.MAX_HEALTH);
-            if (maxHealthAttr != null) {
-                double maxHealth = maxHealthAttr.getValue();
-                AttributeInstance npcMaxHealth = npcPlayer.getAttribute(Attribute.MAX_HEALTH);
-                if (npcMaxHealth != null) {
-                    npcMaxHealth.setBaseValue(maxHealth);
+            // Force spawn the NPC and verify
+            boolean spawned = npc.spawn(originalPlayer.getLocation());
+            if (!spawned) {
+                LogUtil.error("Failed to spawn NPC at location", null);
+                return null;
+            }
+
+            LogUtil.debug("NPC spawned successfully");
+
+            if (npc.getEntity() instanceof Player npcPlayer) {
+                // Set health
+                AttributeInstance maxHealthAttr = originalPlayer.getAttribute(Attribute.MAX_HEALTH);
+                if (maxHealthAttr != null) {
+                    double maxHealth = maxHealthAttr.getValue();
+                    AttributeInstance npcMaxHealth = npcPlayer.getAttribute(Attribute.MAX_HEALTH);
+                    if (npcMaxHealth != null) {
+                        npcMaxHealth.setBaseValue(maxHealth);
+                    }
                 }
+                npcPlayer.setHealth(doppel.getHealth());
+
+                // Copy equipment directly to NPC player
+                npcPlayer.getInventory().setArmorContents(originalPlayer.getInventory().getArmorContents());
+                npcPlayer.getInventory().setContents(originalPlayer.getInventory().getContents());
+                npcPlayer.getInventory().setItemInMainHand(originalPlayer.getInventory().getItemInMainHand().clone());
+                npcPlayer.getInventory().setItemInOffHand(originalPlayer.getInventory().getItemInOffHand().clone());
+
+                LogUtil.debug("Copied inventory and equipment to NPC");
             }
-            npcPlayer.setHealth(doppel.getHealth());
+
+            // Add CombatLogTrait
+            CombatLogTrait trait = npc.getOrAddTrait(CombatLogTrait.class);
+            trait.setParentPlayer(originalPlayer);
+
+            npc.data().set("owner-uuid", originalPlayer.getUniqueId());
+            doppel.setNPC(npc);
+
+            LogUtil.combat(String.format("Created Doppel NPC for player %s with ID %s",
+                    originalPlayer.getName(), npc.getUniqueId()));
+            return npc;
+        } catch (Exception e) {
+            LogUtil.error("Error creating NPC Doppel", e);
+            return null;
         }
-
-        npc.getNavigator().getDefaultParameters().baseSpeed(0.8f);
-
-        // Copy equipment
-        Equipment equipment = npc.getOrAddTrait(Equipment.class);
-        equipment.set(Equipment.EquipmentSlot.HELMET, originalPlayer.getInventory().getHelmet());
-        equipment.set(Equipment.EquipmentSlot.CHESTPLATE, originalPlayer.getInventory().getChestplate());
-        equipment.set(Equipment.EquipmentSlot.LEGGINGS, originalPlayer.getInventory().getLeggings());
-        equipment.set(Equipment.EquipmentSlot.BOOTS, originalPlayer.getInventory().getBoots());
-        equipment.set(Equipment.EquipmentSlot.HAND, originalPlayer.getInventory().getItemInMainHand());
-        equipment.set(Equipment.EquipmentSlot.OFF_HAND, originalPlayer.getInventory().getItemInOffHand());
-
-        // Copy inventory
-        Inventory npcInv = npc.getOrAddTrait(Inventory.class);
-        ItemStack[] playerInventory = originalPlayer.getInventory().getContents();
-        for (int i = 0; i < playerInventory.length; i++) {
-            ItemStack item = playerInventory[i];
-            if (item != null) {
-                npcInv.setItem(i, item);
-            }
-        }
-
-        npc.data().set("owner-uuid", originalPlayer.getUniqueId());
-
-        doppel.setNPC(npc);
-
-        LogUtil.combat(String.format("Created Doppel NPC for player %s with ID %s",
-                originalPlayer.getName(), npc.getUniqueId()));
-        return npc;
     }
 
     public NPC getNPC(UUID npcUniqueId) {
@@ -89,9 +88,33 @@ public class NPCManager {
     public void removeNPC(NPC npc) {
         if (npc != null) {
             LogUtil.debug(String.format("Removing NPC: ID=%s, Name=%s", npc.getUniqueId(), npc.getName()));
-            npc.despawn();
-            npc.destroy();
-            LogUtil.combat(String.format("Removed Doppel NPC: %s", npc.getUniqueId()));
+            try {
+                // Force remove all traits first
+                if (npc.hasTrait(CombatLogTrait.class)) {
+                    npc.removeTrait(CombatLogTrait.class);
+                }
+                if (npc.hasTrait(Equipment.class)) {
+                    npc.removeTrait(Equipment.class);
+                }
+                if (npc.hasTrait(Inventory.class)) {
+                    npc.removeTrait(Inventory.class);
+                }
+
+                // Force despawn first
+                if (npc.isSpawned()) {
+                    npc.despawn();
+                }
+
+                // Then destroy
+                npc.destroy();
+
+                // Remove from registry explicitly
+                npcRegistry.deregister(npc);
+
+                LogUtil.combat(String.format("Removed Doppel NPC: %s", npc.getUniqueId()));
+            } catch (Exception e) {
+                LogUtil.error("Error while removing NPC", e);
+            }
         }
     }
 
