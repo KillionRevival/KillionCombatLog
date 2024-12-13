@@ -1,10 +1,10 @@
 settings:
   combat-tag-duration: 30             # Duration (in seconds) a player is tagged in combat
-  reengagement-duration: 10           # Additional seconds added when combat is re-engaged
-  doppel-swap-duration: 15            # Additional seconds added when a Doppel swaps in
-  max-duration: 60                    # Maximum duration of combat (in seconds)
+  reengagement-duration: 30           # Additional seconds added when combat is re-engaged
+  doppel-swap-duration: 30            # Additional seconds added when a Doppel swaps in
+  max-duration: 30                    # Maximum duration of combat (in seconds)
   max-session-length: 300             # Maximum total session length (in seconds)
-  debug-mode: false                   # Enables debug logging for more detailed output
+  debug-mode: true                   # Enables debug logging for more detailed output
   custom-death-messages: true         # Whether custom death messages are enabled
 
 messages:

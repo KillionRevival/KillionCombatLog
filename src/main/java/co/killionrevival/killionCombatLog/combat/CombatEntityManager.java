@@ -4,6 +4,7 @@ import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.util.LogUtil;
 import org.bukkit.entity.Player;
 
+import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,5 +32,15 @@ public class CombatEntityManager {
         if (entity != null) {
             entity.handleSafeZoneEntry();
         }
+    }
+
+    /**
+     * Gets all current combat entities.
+     * Used primarily for shutdown cleanup.
+     *
+     * @return Collection of all combat entities
+     */
+    public Collection<CombatEntity> getAllEntities() {
+        return entities.values();
     }
 }

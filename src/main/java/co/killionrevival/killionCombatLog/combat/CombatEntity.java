@@ -4,8 +4,10 @@ import co.killionrevival.killioncombatlog.KillionCombatLog;
 import co.killionrevival.killioncombatlog.util.LogUtil;
 import lombok.Getter;
 import lombok.Setter;
+import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.HashSet;
@@ -15,13 +17,9 @@ import java.util.UUID;
 
 public class CombatEntity {
     private final KillionCombatLog plugin;
-    @Getter
-    private final UUID playerId;
-    @Setter
-    @Getter
-    private Player player;
-    @Getter
-    private Doppel doppel;
+    @Getter private final UUID playerId;
+    @Setter @Getter private Player player;
+    @Getter private Doppel doppel;
     private final Set<CombatSession> activeSessions = new HashSet<>();
 
     public CombatEntity(KillionCombatLog plugin, Player player) {
@@ -58,13 +56,29 @@ public class CombatEntity {
     private CombatSession handleCombatSession(CombatEntity attackerEntity) {
         if (attackerEntity == null || attackerEntity == this) return null;
 
+        // Check for existing session with either the player or their doppel
         CombatSession existingSession = getSessionWith(attackerEntity.getPlayerId());
+
+        // Additional check for if attacker has a doppel
+        if (existingSession == null && attackerEntity.hasDoppel()) {
+            existingSession = getSessionWith(attackerEntity.getDoppel().getOwnerId());
+        }
+
+        // Additional check for if victim has a doppel
+        if (existingSession == null && this.hasDoppel()) {
+            existingSession = attackerEntity.getSessionWith(this.getDoppel().getOwnerId());
+        }
+
         if (existingSession == null) {
-            LogUtil.debug("Creating new combat session between " + playerId + " and " + attackerEntity.getPlayerId());
+            LogUtil.debug(String.format("Creating new combat session between %s and %s",
+                    attackerEntity.getPlayerId(), this.getPlayerId()));
             CombatSession newSession = plugin.getCombatSessionManager().createSession(attackerEntity, this);
+
+            // Link session to both entities
             attackerEntity.addSession(newSession);
             this.addSession(newSession);
 
+            // Fire combat state events
             if (!attackerEntity.isInCombat() && attackerEntity.getPlayer() != null) {
                 plugin.getServer().getPluginManager().callEvent(
                     new PlayerCombatStateChangedEvent(attackerEntity.getPlayer(), true));
@@ -84,7 +98,7 @@ public class CombatEntity {
 
     public void handleLogout(boolean isPvPZone) {
         LogUtil.debug(String.format("Handling logout for player %s. PvP Zone: %b, In Combat: %b",
-            player.getName(), isPvPZone, isInCombat()));
+                player.getName(), isPvPZone, isInCombat()));
 
         if (!isPvPZone) {
             LogUtil.debug("Non-PvP zone logout, ending combat sessions");
@@ -97,20 +111,60 @@ public class CombatEntity {
         }
 
         if (player != null) {
-            double currentHealth = player.getHealth();
-            LogUtil.debug(String.format("Creating Doppel for player %s with health %f",
-                player.getName(), currentHealth));
+            // Ensure we have the most current player state
+            player.updateInventory();
 
-            // Store the current health in the database
-            plugin.getDatabaseManager().saveDoppelState(
-                player.getUniqueId(),
-                currentHealth,
-                player.getInventory().getContents(),
-                player.getInventory().getArmorContents(),
-                player.getLocation().toString()
+            // Create fresh copies of inventory contents
+            ItemStack[] currentInventory = player.getInventory().getContents().clone();
+            ItemStack[] currentArmor = player.getInventory().getArmorContents().clone();
+
+            // Log inventory contents for debugging
+            LogUtil.debug("Current inventory contents at logout:");
+            for (int i = 0; i < currentInventory.length; i++) {
+                if (currentInventory[i] != null) {
+                    LogUtil.debug(String.format("Slot %d: %s", i, currentInventory[i].getType()));
+                }
+            }
+
+            Location exactLoc = player.getLocation();
+            double exactX = exactLoc.getX();
+            double exactY = exactLoc.getY();
+            double exactZ = exactLoc.getZ();
+            float exactYaw = exactLoc.getYaw();
+            float exactPitch = exactLoc.getPitch();
+
+            // Create a precise location object
+            Location preciseLocation = new Location(
+                    exactLoc.getWorld(),
+                    exactX,
+                    exactY,
+                    exactZ,
+                    exactYaw,
+                    exactPitch
             );
 
-            this.doppel = new Doppel(player.getUniqueId(), currentHealth, player.getInventory().getContents());
+            LogUtil.debug(String.format("Creating Doppel at precise location: x=%.6f, y=%.6f, z=%.6f, yaw=%.6f, pitch=%.6f",
+                exactX, exactY, exactZ, exactYaw, exactPitch));
+
+            // Store precise location
+            plugin.getDatabaseManager().saveDoppelState(
+                    player.getUniqueId(),
+                    player.getHealth(),
+                    currentInventory,    // Use fresh copy
+                    currentArmor,        // Use fresh copy
+                    String.format("%.6f,%6f,%6f,%6f,%6f,%s",
+                            exactX, exactY, exactZ, exactYaw, exactPitch,
+                            exactLoc.getWorld().getName())
+            );
+
+            // Create new Doppel with fresh inventory data
+            this.doppel = new Doppel(
+                    player.getUniqueId(),
+                    player.getHealth(),
+                    currentInventory,    // Use fresh copy
+                    preciseLocation
+            );
+
             plugin.getNPCManager().createNPC(doppel, player);
 
             if (!isInCombat()) {
@@ -140,18 +194,14 @@ public class CombatEntity {
                 // Try to get health from different sources in order of preference
                 double finalHealth;
 
-                // 1. Try NPC's current health first
+                // Try NPC's current health first
                 if (doppel.getNpc().getEntity() instanceof Player npcPlayer) {
                     finalHealth = npcPlayer.getHealth();
                     LogUtil.debug("Using NPC's current health: " + finalHealth);
-                }
-                // 2. Try stored final health
-                else if (doppel.getNpc().data().has("final-health")) {
+                } else if (doppel.getNpc().data().has("final-health")) {
                     finalHealth = doppel.getNpc().data().get("final-health");
                     LogUtil.debug("Using stored final health: " + finalHealth);
-                }
-                // 3. Fall back to original Doppel health
-                else {
+                } else {
                     finalHealth = doppel.getHealth();
                     LogUtil.debug("Using original Doppel health: " + finalHealth);
                 }

@@ -119,11 +119,29 @@ public final class KillionCombatLog extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        LogUtil.info("Beginning plugin shutdown sequence...");
+
+        // End all combat sessions first
+        if (combatSessionManager != null) {
+            for (CombatSession session : combatSessionManager.getActiveSessions()) {
+                combatManager.endCombatSession(session, CombatEndReason.PLUGIN_SHUTDOWN);
+            }
+            combatSessionManager.shutdown();
+        }
+
+        // Clean up any remaining doppels
+        if (entityManager != null) {
+            for (CombatEntity entity : entityManager.getAllEntities()) {
+                if (entity.hasDoppel()) {
+                    LogUtil.debug("Cleaning up doppel for player " + entity.getPlayerId() + " during shutdown");
+                    entity.removeDoppel();
+                }
+            }
+        }
+
+        // Regular cleanup
         if (combatManager != null) {
             combatManager.shutdown();
-        }
-        if (combatSessionManager != null) {
-            combatSessionManager.shutdown();
         }
         if (databaseManager != null) {
             databaseManager.cleanup();
@@ -139,5 +157,4 @@ public final class KillionCombatLog extends JavaPlugin {
     public TraitManager getTraitManager() {
         return traitManager;
     }
-
 }

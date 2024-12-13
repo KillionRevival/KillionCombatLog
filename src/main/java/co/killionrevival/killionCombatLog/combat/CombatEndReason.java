@@ -10,7 +10,8 @@ public enum CombatEndReason {
     COMBATANT_VICTORY,
     VICTIM_VICTORY,
     MUTUAL_DEATH,
-    ENTERED_SAFE_ZONE;
+    ENTERED_SAFE_ZONE,
+    PLUGIN_SHUTDOWN;
 
     public String getMessage() {
         return switch (this) {
@@ -21,6 +22,7 @@ public enum CombatEndReason {
             case VICTIM_VICTORY -> "Combat ended - Victim victorious";
             case MUTUAL_DEATH -> "Combat ended - Mutual defeat";
             case ENTERED_SAFE_ZONE -> "Combat ended - Entered safe zone";
+            case PLUGIN_SHUTDOWN -> "Combat ended - Plugin shutdown";
         };
     }
 

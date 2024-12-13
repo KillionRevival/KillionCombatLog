@@ -2,6 +2,7 @@ package co.killionrevival.killioncombatlog.combat;
 
 import lombok.Getter;
 import net.citizensnpcs.api.npc.NPC;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -16,11 +17,13 @@ public class Doppel {
     private NPC npc;
     private final double health;
     private final ItemStack[] inventoryContents;
+    private final Location lastLocation;  // Added precise location storage
 
-    public Doppel(UUID ownerId, double health, ItemStack[] inventoryContents) {
+    public Doppel(UUID ownerId, double health, ItemStack[] inventoryContents, Location location) {
         this.ownerId = ownerId;
         this.health = health;
         this.inventoryContents = inventoryContents.clone();
+        this.lastLocation = location.clone();  // Store exact location
     }
 
     public void setNPC(NPC npc) {
